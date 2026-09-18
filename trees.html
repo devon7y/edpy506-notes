@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision trees and random forests | EDPY 506 notes</title>
+<meta name="description" content="Decision trees for regression: how a split is chosen, why deep trees overfit, cost-complexity pruning, random forests, and variable importance.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">EDPY 506 <span>· notes</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Topics"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Topic 2</p>
+      <h1>Decision trees and random forests</h1>
+      <p class="lede">
+        Instead of fitting one shape to all the data, cut the data into pieces and predict
+        an average within each piece. That one change buys the ability to fit curves a line
+        cannot — and brings a new way to fail.
+      </p>
+      <nav class="toc" aria-label="On this page">
+        <a href="#why">Why not a line</a>
+        <a href="#anatomy">What a tree is</a>
+        <a href="#split">Choosing a split</a>
+        <a href="#depth">Growing the tree</a>
+        <a href="#prune">Pruning</a>
+        <a href="#hyper">The other knobs</a>
+        <a href="#tradeoffs">What trees are good and bad at</a>
+        <a href="#forest">Random forests</a>
+        <a href="#importance">Variable importance</a>
+        <a href="#permute">Permutation importance</a>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ==================== 1. WHY NOT A LINE ==================== -->
+  <section class="chapter" id="why">
+    <div class="prose">
+      <h2><span class="steplabel">1</span>Why not a line</h2>
+      <p>
+        Linear and regularized regression both look for the best fitting line, and both
+        work very well when the features and the output have a linear relationship. When
+        they do not, the line has nowhere to go. It cannot capture a non-linear
+        relationship no matter how it is fitted, how many features are added, or how λ is
+        tuned, because the problem is the shape of the model rather than its coefficients.
+      </p>
+      <p>
+        Decision trees take a different route. They first divide the prediction space into
+        smaller sub-spaces, fit a model within each sub-space, and combine those into a
+        prediction model. For regression the model inside each sub-space is the simplest
+        one there is: the average of the homes that fall in it.
+      </p>
+      <p>
+        Here is the relationship from the <a href="regression.html#fitting">regression
+        page</a> again — price against the age of the home, for
+        <span id="curve-desc"></span> — with a straight line and a shallow tree side by side.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The same homes, two model shapes</div>
+      <div class="figure__sub">
+        Neither model has been tuned. The line is ordinary least squares; the tree is four
+        splits deep.
+      </div>
+      <div class="split split--even">
+        <div id="vs-line"></div>
+        <div id="vs-tree"></div>
+      </div>
+      <div class="stats" id="vs-stats" style="margin-top:1rem"></div>
+      <div class="figure__note" id="vs-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 2. WHAT A TREE IS ==================== -->
+  <section class="chapter" id="anatomy">
+    <div class="prose">
+      <h2><span class="steplabel">2</span>What a decision tree is</h2>
+      <p>
+        Decision trees, also called <strong>classification and regression trees</strong> or
+        CART, are one of the best-known supervised learning algorithms, and they work for
+        both kinds of target. A tree predicting a category is a classification tree; a tree
+        predicting a number is a regression tree. The structure is identical.
+      </p>
+      <p>
+        A decision tree looks like an inverted tree with three parts:
+      </p>
+      <ol>
+        <li><strong>A root node</strong> — the starting point of the prediction.</li>
+        <li><strong>Decision nodes</strong> — where the model splits the data into smaller
+          subsets.</li>
+        <li><strong>Leaf nodes</strong>, also called terminal nodes — where the model makes
+          its prediction within a subset.</li>
+      </ol>
+      <p>
+        A prediction is made by walking the splits from the root until you arrive at a leaf,
+        and reading off the value stored there. That process is called <strong>recursive
+        partitioning</strong>.
+      </p>
+      <p>
+        <strong>Pick a home and watch it fall through.</strong> The path it takes is
+        highlighted, and the leaf it lands in is the price the tree predicts for it.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One home, walked to its leaf</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Home</span>
+          <select id="walk-home"></select>
+        </label>
+      </div>
+      <div class="split split--wide-left">
+        <div id="walk-tree"></div>
+        <div>
+          <div id="walk-steps"></div>
+          <div class="stats stats--1" id="walk-stats" style="margin-top:0.8rem"></div>
+        </div>
+      </div>
+      <div class="figure__note">
+        The number in each node is the average price of the homes that reach it. Only the
+        number in the leaf is ever used as a prediction; the ones above are what the
+        prediction would have been had the tree stopped there.
+      </div>
+    </div>
+
+    <div class="prose">
+      <div class="callout">
+        <strong>The picture is the model.</strong> One of the main advantages of decision
+        trees is that the model can be generated visually, with the decisions it takes on
+        display, which helps in understanding its predictive behaviour. Compared with
+        linear regression, CART is also better at making use of categorical features and at
+        handling multicollinearity, meaning high correlations among the features.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 3. CHOOSING A SPLIT ==================== -->
+  <section class="chapter" id="split">
+    <div class="prose">
+      <h2><span class="steplabel">3</span>Where a split comes from</h2>
+      <p>
+        Splitting is done in a <strong>top-down, greedy</strong> fashion. Greedy because a
+        partition performed earlier in the tree will not change based on later partitions:
+        once a split is made it is never revisited, even if a different first cut would have
+        allowed a better second one.
+      </p>
+      <p>
+        The model begins with the entire dataset and searches <em>every distinct value of
+        every input variable</em> for the predictor and split value that divide the data
+        into two regions, <em>R</em><sub>1</sub> and <em>R</em><sub>2</sub>, minimising the
+        overall sum of squared error:
+      </p>
+      <div class="formula">
+        minimize SSE = <span class="sum">Σ</span><sub><em>i</em>∈<em>R</em><sub>1</sub></sub>
+        (<em>y</em><sub><em>i</em></sub> − <em>c</em><sub>1</sub>)²
+        + <span class="sum">Σ</span><sub><em>i</em>∈<em>R</em><sub>2</sub></sub>
+        (<em>y</em><sub><em>i</em></sub> − <em>c</em><sub>2</sub>)²
+        <span class="lbl"><em>c</em><sub>1</sub> and <em>c</em><sub>2</sub> are the constants
+          used for the two regions — each is that region's average</span>
+      </div>
+      <p>
+        Having found the best split, the data are partitioned into the two resulting regions
+        and the process repeats on each of them, continuing until some stopping criterion is
+        reached.
+      </p>
+      <p>
+        <strong>Move the split yourself.</strong> The chart underneath is the actual search:
+        it plots the total SSE for every place the split could go. The tree takes the
+        bottom of that curve.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The greedy search, drawn</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Split at age</span>
+          <input type="range" id="split-at" min="2" max="78" step="0.5" value="45">
+          <output id="split-out"></output>
+        </label>
+        <button class="btn btn--primary" id="split-best">Take the best split</button>
+      </div>
+      <div id="split-chart"></div>
+      <div id="split-sse" style="margin-top:0.8rem"></div>
+      <div class="stats stats--3" id="split-stats" style="margin-top:1rem;"></div>
+      <div class="figure__note" id="split-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 4. GROWING THE TREE ==================== -->
+  <section class="chapter" id="depth">
+    <div class="prose">
+      <h2><span class="steplabel">4</span>Growing the tree, and overgrowing it</h2>
+      <p>
+        Repeat that search inside each region and the tree deepens. Every extra level
+        doubles the number of regions available, so the prediction becomes a finer and
+        finer staircase.
+      </p>
+      <p>
+        <strong>Add levels and watch the two error numbers.</strong> Training error can only
+        fall, because a deeper tree is a strictly more flexible version of a shallower one.
+        Test error does not have to.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Depth against error</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Maximum depth</span>
+          <input type="range" id="tree-depth" min="1" max="8" value="1">
+          <output id="depth-out"></output>
+        </label>
+      </div>
+      <div class="split split--even">
+        <div id="depth-chart"></div>
+        <div id="depth-tree"></div>
+      </div>
+      <div class="stats stats--3" id="depth-stats" style="margin-top:1rem;"></div>
+      <div id="depth-curve" style="margin-top:1rem"></div>
+      <div class="legend" id="depth-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="depth-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <strong>This is the same bias–variance curve as on the regression page, with a
+        different knob.</strong> There, complexity was the degree of a polynomial; here it
+        is the depth of a tree. The shape of the story does not change: training error falls
+        forever, test error bottoms out and then climbs, and the only way to see it happen
+        is to hold data back.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 5. PRUNING ==================== -->
+  <section class="chapter" id="prune">
+    <div class="prose">
+      <h2><span class="steplabel">5</span>Pruning</h2>
+      <p>
+        There is a balance to be struck in the depth and complexity of a tree, to get the
+        best predictive performance on unseen data. Deeper nodes tend to overfit to specific
+        attributes of the sample, so a slightly different sample produces highly variable
+        predicted values in the terminal nodes.
+      </p>
+      <p>
+        The solution is <strong>pruning</strong>: eliminating some lower-level nodes to
+        stabilise predictions and improve how well the model generalises. It does so at a
+        cost — pruning introduces a certain degree of bias, by design.
+      </p>
+      <p>
+        Which nodes to cut is decided by a <strong>cost complexity parameter</strong>, α,
+        which works like the lasso penalty from the <a href="regression.html#lasso">previous
+        page</a>: it charges the model for its own size.
+      </p>
+      <div class="formula">
+        minimize SSE + α|<em>T</em>|
+        <span class="lbl">α is the complexity parameter — at 0, no pruning occurs;
+          |<em>T</em>| is the number of terminal nodes in the tree</span>
+      </div>
+      <p>
+        Smaller penalties tend to produce more complex models, meaning larger trees. Larger
+        penalties result in much smaller trees. The optimal α is found the same way λ was:
+        train multiple models across a spectrum of α and use cross-validation to identify
+        the best one.
+      </p>
+      <p>
+        <strong>Turn α up on a deliberately overgrown tree.</strong> It starts at
+        <span id="prune-full"></span> leaves, one for almost every training home.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Cutting a tree back</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Cost complexity α</span>
+          <input type="range" id="alpha" min="0" max="100" value="0">
+          <output id="alpha-out"></output>
+        </label>
+        <button class="btn" id="alpha-best">Take the α with the lowest test error</button>
+      </div>
+      <div class="split split--even">
+        <div id="prune-chart"></div>
+        <div id="prune-tree"></div>
+      </div>
+      <div class="stats stats--3" id="prune-stats" style="margin-top:1rem;"></div>
+      <div class="figure__note" id="prune-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 6. HYPERPARAMETERS ==================== -->
+  <section class="chapter" id="hyper">
+    <div class="prose">
+      <h2><span class="steplabel">6</span>The other knobs</h2>
+      <p>
+        Besides the cost complexity parameter α, it is common to tune a decision tree with
+        three more:
+      </p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>Hyperparameter</th><th>What it sets</th><th>Default in Python</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Maximum depth</strong></td>
+              <td>The maximum number of internal nodes between the root node and the terminal nodes.</td>
+              <td>no default</td></tr>
+            <tr><td><strong>Minimum split</strong></td>
+              <td>The minimum number of samples required to split an internal node.</td>
+              <td>2</td></tr>
+            <tr><td><strong>Minimum leaf</strong></td>
+              <td>The minimum number of samples required to be at a leaf node.</td>
+              <td>1</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        All three do the same job from different directions — they stop the tree before it
+        carves the data down to individual homes. Notice what the defaults imply: a minimum
+        leaf of 1 and no depth limit means that, left alone, a decision tree will grow until
+        every training home has a leaf of its own.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">All four knobs at once</div>
+      <div class="figure__sub">The same training homes, with every stopping rule exposed.</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Max depth</span>
+          <input type="range" id="h-depth" min="1" max="10" value="10"><output id="h-depth-out"></output></label>
+        <label class="field"><span class="field__name">Min split</span>
+          <input type="range" id="h-split" min="2" max="20" value="2"><output id="h-split-out"></output></label>
+        <label class="field"><span class="field__name">Min leaf</span>
+          <input type="range" id="h-leaf" min="1" max="12" value="1"><output id="h-leaf-out"></output></label>
+        <button class="btn" id="h-defaults">Python defaults</button>
+      </div>
+      <div class="split split--even">
+        <div id="h-chart"></div>
+        <div id="h-tree"></div>
+      </div>
+      <div class="stats stats--3" id="h-stats" style="margin-top:1rem;"></div>
+      <div class="figure__note" id="h-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 7. TRADE-OFFS ==================== -->
+  <section class="chapter" id="tradeoffs">
+    <div class="prose">
+      <h2><span class="steplabel">7</span>What trees are good and bad at</h2>
+    </div>
+    <div class="figure" style="max-width: 52rem;">
+      <div class="figure__title">Advantages</div>
+      <div class="traits" style="margin-top:0.6rem">
+        <div class="trait trait--good">Efficient<small>Fitting is a search over splits, and prediction is a walk down a handful of comparisons</small></div>
+        <div class="trait trait--good">Interpretability<small>Every prediction is a short list of yes-or-no answers</small></div>
+        <div class="trait trait--good">Explainability<small>You can say not just what it predicted but which rules got it there</small></div>
+        <div class="trait trait--good">Visual display<small>The whole model fits on a page, as the figures above do</small></div>
+      </div>
+    </div>
+    <div class="figure" style="max-width: 52rem;">
+      <div class="figure__title">Limitations</div>
+      <div class="traits" style="margin-top:0.6rem">
+        <div class="trait trait--bad">Overfitting<small>Left unpruned, a tree memorises the training data outright</small></div>
+        <div class="trait trait--bad">High variance<small>Refit it on a slightly different sample and you get a noticeably different tree</small></div>
+        <div class="trait trait--bad">Low bias<small>The flip side of the same coin: flexible enough to fit anything, including the noise</small></div>
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>
+        High variance is worth seeing rather than being told about, because it is the
+        specific weakness the next section exists to fix. <strong>Redraw the training
+        homes.</strong> Same underlying relationship, same settings, a different sample of
+        the same size each time.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The same tree, fitted eight times</div>
+      <div class="figure__sub">
+        Eight independent samples of <span id="var-n"></span> homes, each grown into its own
+        depth-4 tree. Every line is one tree's predictions across the whole age range.
+      </div>
+      <div class="controls">
+        <button class="btn btn--primary" id="var-redraw">Draw eight new samples</button>
+        <label class="field"><span class="field__name">Show</span>
+          <div class="segmented" id="var-mode">
+            <button type="button" data-m="all" aria-pressed="true">All eight</button>
+            <button type="button" data-m="avg" aria-pressed="false">Their average</button>
+          </div>
+        </label>
+      </div>
+      <div id="var-chart"></div>
+      <div class="figure__note" id="var-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 8. RANDOM FORESTS ==================== -->
+  <section class="chapter" id="forest">
+    <div class="prose">
+      <h2><span class="steplabel">8</span>Random forests</h2>
+      <p>
+        If one tree swings that much, average a lot of them. But trees grown on the same
+        data all look alike, and averaging near-identical models buys nothing. A
+        <strong>random forest</strong> makes the trees differ on purpose: it decides where
+        to split based on a <strong>random selection of features</strong>.
+      </p>
+      <p>
+        How many features each split gets to consider is usually
+        <em>m</em> ≈ <span class="sqrt">√</span><span class="sqrt"><em>p</em></span>, where
+        <em>p</em> is the total number of features — so <em>m</em> = 4 for a set of 15 or 16
+        features.
+      </p>
+      <p>
+        Rather than splitting on similar features at each node, the trees in a forest are
+        forced apart, because each one splits on different features. That differentiation
+        provides a greater ensemble to aggregate over, and produces a more accurate
+        prediction.
+      </p>
+      <p>
+        This figure uses all <span id="rf-p"></span> features of the homes rather than age
+        alone, on <span id="rf-n"></span> training homes and <span id="rf-t"></span> held
+        out for testing.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One tree, against a forest of them</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Trees in the forest</span>
+          <input type="range" id="rf-n-trees" min="1" max="100" value="60"><output id="rf-n-trees-out"></output></label>
+        <label class="field"><span class="field__name">Features per split (<em>m</em>)</span>
+          <input type="range" id="rf-mtry" min="1" max="9" value="3"><output id="rf-mtry-out"></output></label>
+        <span class="small muted" id="rf-busy"></span>
+      </div>
+      <div id="rf-chart"></div>
+      <div class="legend" id="rf-legend" style="margin-top:0.6rem"></div>
+      <div class="stats" id="rf-stats" style="margin-top:1rem"></div>
+      <div class="figure__note" id="rf-note"></div>
+    </div>
+
+    <div class="figure" style="max-width: 52rem;">
+      <div class="split split--even">
+        <div>
+          <div class="figure__title" style="color:var(--good)">Advantages</div>
+          <ul class="small" style="line-height:1.55">
+            <li>It often works well out of the box, without tuning any parameters.</li>
+            <li>It tends not to overfit.</li>
+            <li>It can handle non-linear numeric and categorical features and output.</li>
+          </ul>
+        </div>
+        <div>
+          <div class="figure__title" style="color:var(--critical)">Disadvantages</div>
+          <ul class="small" style="line-height:1.55">
+            <li>A forest is less interpretable than a single decision tree.</li>
+            <li>A forest may require significant memory for storage, because many trees have
+              to be retained.</li>
+            <li>Although random forests can be an improvement on single decision trees, more
+              sophisticated techniques are available.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="prose">
+      <div class="callout callout--warn" id="forest-cost"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 9. VARIABLE IMPORTANCE ==================== -->
+  <section class="chapter" id="importance">
+    <div class="prose">
+      <h2><span class="steplabel">9</span>Which predictors actually matter</h2>
+      <p>
+        Having built a random forest, we often want to know: <em>which predictors actually
+        matter?</em> The forest has traded the single tree's readable diagram for accuracy,
+        so the question needs answering some other way.
+      </p>
+      <p>
+        <strong>Variable importance</strong> ranks features by how much they contribute to
+        the model's predictions. There are two common approaches.
+      </p>
+      <div class="split split--even" style="margin-top:1.2rem">
+        <div class="card">
+          <h3>Mean decrease in impurity</h3>
+          <p class="small" style="margin-top:0.4rem">
+            How much does each variable reduce impurity, for instance the Gini index, across
+            all the trees on average, whenever it is used to split?
+          </p>
+        </div>
+        <div class="card">
+          <h3>Permutation importance</h3>
+          <p class="small" style="margin-top:0.4rem">
+            Shuffle one variable's values, breaking its relationship with the outcome, and
+            see how much prediction accuracy drops.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 10. PERMUTATION IMPORTANCE ==================== -->
+  <section class="chapter" id="permute">
+    <div class="prose">
+      <h2><span class="steplabel">10</span>Permutation importance, step by step</h2>
+      <ol>
+        <li>Train the random forest as usual.</li>
+        <li>Measure baseline accuracy on test data.</li>
+        <li>Pick one variable and randomly shuffle its values, destroying its real
+          relationship with the outcome, keeping every other variable untouched.</li>
+        <li>Re-run predictions with the shuffled data and measure the drop in accuracy.</li>
+        <li>Repeat for each variable.</li>
+      </ol>
+      <p>
+        A <strong>bigger drop means a more important variable</strong>. Little or no drop
+        means that variable was not contributing much.
+      </p>
+      <p>
+        <strong>Shuffle the columns one at a time.</strong> The table is the test homes —
+        ones the forest has never seen. Scrambling a column leaves every other column where
+        it was, so any change in the error is down to that column alone.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Shuffle a column, watch the error</div>
+      <div class="split split--controls">
+        <div>
+          <div class="small muted" style="margin-bottom:0.45rem">Shuffle a column:</div>
+          <div class="controls" id="pi-buttons"></div>
+          <div class="controls" style="margin-bottom:0">
+            <button class="btn btn--primary" id="pi-all">Test every column</button>
+            <button class="btn" id="pi-reset">Put the data back</button>
+          </div>
+        </div>
+        <div class="stats stats--1" id="pi-stats"></div>
+      </div>
+      <div class="table-scroll" style="margin-top:1.1rem">
+        <table class="data data--tight" id="pi-table"></table>
+      </div>
+      <div style="margin-top:1.4rem">
+        <div class="figure__title">Importance so far — the rise in typical error when that column is scrambled</div>
+        <div id="pi-bars" style="margin-top:0.8rem"></div>
+      </div>
+      <div class="figure__note" id="pi-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint" id="pi-keypoint"></div>
+      <p>
+        That is worth putting beside the multiple regression table on the
+        <a href="regression.html#many">regression page</a>. Least squares handed every one
+        of those same do-nothing predictors a non-zero coefficient and no way to tell it
+        apart from a real one. Permutation importance asks a blunter question — does the
+        model get worse without it — and the do-nothing predictors answer it honestly.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Course notes for EDPY 506, University of Alberta · Content follows the lectures of
+    Dr. Okan Bulut · <a href="index.html">Back to the index</a>
+  </div>
+</footer>
+
+<script type="module" src="assets/trees-page.js"></script>
+</body>
+</html>

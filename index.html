@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EDPY 506 — machine learning, worked through | Course notes</title>
+<meta name="description" content="Interactive notes for EDPY 506 Machine Learning: Theory and Applications. Every idea from the lectures, rebuilt as something you can move and break.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">EDPY 506 <span>· notes</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Topics"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+
+  <section style="padding: 3.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Machine Learning: Theory and Applications · University of Alberta</p>
+      <h1>Every model in this course, as something you can move</h1>
+      <p class="lede">
+        These are my notes for EDPY 506, rebuilt one topic at a time. A lecture
+        describes what a model does; this site lets you drag the parameter and watch it
+        happen. Nothing here goes beyond what the course covered.
+      </p>
+    </div>
+  </section>
+
+  <!-- The hook: the running example, and the one fact that motivates all of it. -->
+  <figure class="figure figure--wide" style="margin-top: 2.5rem;">
+    <div class="figure__title">The example that runs through everything</div>
+    <div class="figure__sub" id="hook-sub"></div>
+    <div class="split split--wide-left">
+      <div id="hook-chart"></div>
+      <div>
+        <div class="stats stats--2" id="hook-stats"></div>
+        <div class="legend" id="hook-legend" style="margin-top:0.7rem"></div>
+      </div>
+    </div>
+    <div class="figure__note" id="hook-note"></div>
+  </figure>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>How to read this</h2>
+      <p>
+        Each topic is one page, and each page is built the same way: the idea in words,
+        then a figure you can interact with, then what the figure shows once you have
+        played with it. The figures are not illustrations of the maths. They run the
+        maths, in your browser, on data the page generates while you watch.
+      </p>
+      <p>
+        Every page uses the same example, the Edmonton home prices above, so a model on
+        one page can be compared with a model on another without re-learning a dataset.
+        The homes are simulated rather than real, which means the right answer is known
+        and a page can tell you honestly when a model has found it and when it has not.
+        The example follows the one used in class, and the figures here are built from
+        scratch rather than adapted from the demos shown in the lectures.
+      </p>
+      <div class="callout">
+        <strong>Scope.</strong> Content comes from the lectures and nowhere else. Where a
+        page shows the machinery behind a figure that the lectures did not cover, it says
+        so and puts it in a collapsed aside, so the course material and the
+        implementation detail never get confused with one another.
+      </div>
+    </div>
+    <div class="cards" id="topic-cards" style="margin-top: 1.6rem;"></div>
+  </section>
+
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Course notes for EDPY 506, University of Alberta · Content follows the lectures of
+    Dr. Okan Bulut · Built as a study aid, and wrong in places until it is not.
+    Corrections welcome.
+  </div>
+</footer>
+
+<script type="module">
+import {
+  initChrome, CHAPTERS, svgRoot, frame, scale, el, responsive, token,
+  tooltip, clientToViewBox, mean, money, linePath,
+} from './assets/site.js';
+import { ols, metrics } from './assets/linreg.js';
+import { currentDataset, pairs, labelOf } from './assets/datasets.js';
+
+initChrome();
+
+/* ---- topic cards ---- */
+const blurbs = {
+  'regression.html': 'Fitting a line by least squares, scoring it with R² and RMSE, watching it overfit, and reining it back in with ridge and lasso.',
+  'trees.html': 'Splitting the data instead of fitting a line: where a split comes from, why deep trees overfit, pruning, forests, and which predictors actually mattered.',
+};
+document.getElementById('topic-cards').innerHTML = CHAPTERS
+  .filter((c) => c.href !== 'index.html')
+  .map((c, i) => `<a href="${c.href}">
+      <div class="n">${String(i + 1).padStart(2, '0')}</div>
+      <h3>${c.title}</h3>
+      <p>${blurbs[c.href] || ''}</p>
+    </a>`).join('');
+
+
+/* ---- hook chart: price against size, with the least-squares line ----
+   The same data and the same fit as the opening figure on the regression page,
+   so the first thing a reader sees is the thing the first page explains. */
+const ds = currentDataset();
+const { xs, ys, feature } = pairs(ds, 'linear', 7, 30);
+const fit = ols(xs, ys);
+const yhat = xs.map((x) => fit.b0 + fit.b1 * x);
+const m = metrics(ys, yhat);
+const m0 = metrics(ys, ys.map(() => mean(ys)));
+
+document.getElementById('hook-sub').innerHTML =
+  `${xs.length} homes. Each dot is one home: how big it is, and what it sold for. `
+  + `The line is the one straight line that misses by the least, totalled over every home.`;
+
+document.getElementById('hook-stats').innerHTML = `
+  <div class="stat"><div class="stat__value">${money(m.rmse)}</div>
+    <div class="stat__label">Typical miss, using the line<br><span class="muted">RMSE</span></div></div>
+  <div class="stat stat--muted"><div class="stat__value">${money(m0.rmse)}</div>
+    <div class="stat__label">Typical miss, guessing the average<br><span class="muted">RMSE</span></div></div>`;
+
+document.getElementById('hook-legend').innerHTML = `
+  <span class="legend__item"><span class="legend__swatch legend__swatch--dot" style="background:${token('--series-1')}"></span>A home that sold</span>
+  <span class="legend__item"><span class="legend__swatch legend__swatch--line" style="background:${token('--series-6')}"></span>The least-squares line</span>`;
+
+document.getElementById('hook-note').innerHTML =
+  `Knowing a home's size cuts the typical error from ${money(m0.rmse)} to ${money(m.rmse)} — `
+  + `the line explains <b>${(m.r2 * 100).toFixed(0)}%</b> of the variation in price. `
+  + `It also leaves ${money(m.rmse)} unexplained, on homes averaging ${money(mean(ys))}. `
+  + `Most of this course is about that remainder: what else to measure, what shape to fit, `
+  + `and how to tell a real improvement from one that will not survive contact with a new home.`;
+
+const host = document.getElementById('hook-chart');
+const tip = tooltip();
+
+responsive(host, () => {
+  const w = 620, h = 400;
+  const pad = { l: 66, r: 16, t: 14, b: 42 };
+  const svg = svgRoot(host, w, h);
+  const xlo = Math.min(...xs), xhi = Math.max(...xs);
+  const ylo = Math.min(...ys), yhi = Math.max(...ys);
+  const xs_ = scale(xlo - 60, xhi + 60, pad.l, w - pad.r);
+  const ys_ = scale(ylo - 40000, yhi + 40000, h - pad.b, pad.t);
+
+  frame(svg, w, h, pad, xs_, ys_, {
+    xLabel: labelOf(feature),
+    yLabel: `${ds.target.label} ($)`,
+    xFmt: (v) => Math.round(v).toLocaleString('en-CA'),
+    yFmt: ds.target.short,
+  });
+
+  el('path', {
+    class: 'series-line',
+    d: linePath([[xs_(xlo - 60), ys_(fit.b0 + fit.b1 * (xlo - 60))],
+      [xs_(xhi + 60), ys_(fit.b0 + fit.b1 * (xhi + 60))]]),
+    stroke: token('--series-6'), 'stroke-width': 2.5,
+  }, svg);
+
+  xs.forEach((x, i) => {
+    const c = el('circle', {
+      cx: xs_(x), cy: ys_(ys[i]), r: 5, fill: token('--series-1'),
+      opacity: 0.8, stroke: token('--surface-1'), 'stroke-width': 1.2,
+    }, svg);
+    c.addEventListener('pointerenter', (ev) => tip.show(
+      `<b>${feature.fmt(x)} sq ft</b><br>sold for ${money(ys[i])}`
+      + `<br><span style="opacity:.7">line says ${money(yhat[i])}</span>`,
+      ev.clientX, ev.clientY));
+    c.addEventListener('pointerleave', () => tip.hide());
+  });
+});
+</script>
+</body>
+</html>

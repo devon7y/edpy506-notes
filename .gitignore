@@ -1,0 +1,16 @@
+# --- course materials: NOT ours to publish ---
+# The lecture slides, the syllabus and Dr. Bulut's own HTML demos are his
+# intellectual property. This repository is public so GitHub Pages can serve
+# the site, so none of them may be committed. They stay in the working
+# directory and are read locally as reference while a page is being written --
+# they are what the site is built to explain, not part of what it publishes.
+*.pdf
+*Demo*.html
+
+# --- macOS ---
+.DS_Store
+
+# --- editors / tooling ---
+node_modules/
+.vscode/
+*.log

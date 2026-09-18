@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regression | EDPY 506 notes</title>
+<meta name="description" content="Linear regression for supervised machine learning: least squares, R² and RMSE, the bias–variance trade-off, and ridge and lasso regularization.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">EDPY 506 <span>· notes</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Topics"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Topic 1</p>
+      <h1>Regression</h1>
+      <p class="lede">
+        Predicting a number. This page starts with the single straight line that fits a
+        set of homes best, and ends with the reason you would deliberately choose a line
+        that fits them worse.
+      </p>
+      <nav class="toc" aria-label="On this page">
+        <a href="#what">What makes it regression</a>
+        <a href="#line">Fitting a line</a>
+        <a href="#ols">Least squares</a>
+        <a href="#many">More than one feature</a>
+        <a href="#score">Scoring a fit</a>
+        <a href="#tradeoffs">What it is good and bad at</a>
+        <a href="#biasvar">Bias and variance</a>
+        <a href="#fitting">Under- and overfitting</a>
+        <a href="#ridge">Ridge</a>
+        <a href="#lasso">Lasso</a>
+        <a href="#lambda">Choosing λ</a>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ==================== 1. WHAT MAKES IT REGRESSION ==================== -->
+  <section class="chapter" id="what">
+    <div class="prose">
+      <h2><span class="steplabel">1</span>What makes it regression</h2>
+      <p>
+        Machine learning splits first on whether the data carry labels. With labels it is
+        <strong>supervised</strong>; without them, <strong>unsupervised</strong>.
+        Supervised learning then splits again on the kind of label. A numerical target
+        makes it <strong>regression</strong>. A categorical target makes it
+        <strong>classification</strong>.
+      </p>
+      <p>
+        That second split is the whole of the distinction. Predicting what a home sells
+        for is regression because the answer is a number. Predicting whether it sells
+        within thirty days would be classification, on the same homes, from the same
+        columns.
+      </p>
+      <div class="callout">
+        <strong>To benefit from supervised learning at all, the dataset has to contain the
+        target.</strong> Without a column holding the answer for each row, there is
+        nothing to learn from, and the problem is an unsupervised one — grouping the homes,
+        rather than pricing them.
+      </div>
+      <p>
+        Regression algorithms worth naming, all of which do the same job in different
+        ways: linear regression, simple and multiple; regularized regression, meaning
+        ridge and lasso; decision trees and random forests; support vector machines; and
+        k-nearest neighbours. The first four are on this site. This page covers linear and
+        regularized regression, and <a href="trees.html">trees and forests</a> have their
+        own page.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width: 46rem;">
+      <div class="figure__title">Where regression sits</div>
+      <div id="taxonomy"></div>
+      <div class="figure__note">
+        The branch on the left is the question "does the data come with answers".
+        The branch on the right is the question "is the answer a number".
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 2. FITTING A LINE ==================== -->
+  <section class="chapter" id="line">
+    <div class="prose">
+      <h2><span class="steplabel">2</span>Fitting a line</h2>
+      <p>
+        Linear regression models the relationship between a numerical target and one or
+        more features, and it is the simplest thing that could work. With one feature it
+        is a line, and the line has two numbers in it:
+      </p>
+      <div class="formula">
+        <em>Ŷ</em> = <em>b</em><sub>0</sub> + <em>b</em><sub>1</sub><em>X</em>
+        <span class="lbl">or, writing the part the line misses as its own term,
+          <em>Y</em> = <em>b</em><sub>0</sub> + <em>b</em><sub>1</sub><em>X</em> + ε</span>
+      </div>
+      <p>
+        <strong><em>b</em><sub>0</sub> is the intercept</strong>: what the target would be
+        when the feature is zero. <strong><em>b</em><sub>1</sub> is the slope</strong>: how
+        much the target moves for each one-unit change in the feature. <strong>ε is the
+        residual</strong>, the random error — the part of the real value the line does not
+        account for.
+      </p>
+      <p>
+        One feature makes it <strong>simple</strong> regression. Two or more make it
+        <strong>multiple</strong> regression.
+      </p>
+      <p>
+        <strong>Try to fit these homes by hand.</strong> Move the two sliders and watch
+        the total error underneath. The grey lines are the residuals: what each home
+        actually sold for, minus what your line says it should have.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Find the line that misses by the least</div>
+      <div class="figure__sub">
+        Each vertical line is one home's residual. The goal is the smallest total, and
+        there is exactly one line that achieves it.
+      </div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Intercept <em>b</em><sub>0</sub></span>
+          <input type="range" id="b0" min="-200000" max="400000" step="5000" value="300000">
+          <output id="b0-out"></output>
+        </label>
+        <label class="field"><span class="field__name">Slope <em>b</em><sub>1</sub></span>
+          <input type="range" id="b1" min="0" max="450" step="5" value="60">
+          <output id="b1-out"></output>
+        </label>
+        <button class="btn btn--primary" id="solve">Solve it for me</button>
+        <button class="btn" id="flat">Predict the average instead</button>
+      </div>
+      <div class="split split--wide-left">
+        <div id="line-chart"></div>
+        <div>
+          <div class="stats stats--1" id="line-stats"></div>
+          <div id="sse-bar" style="margin-top:0.8rem"></div>
+        </div>
+      </div>
+      <div class="figure__note" id="line-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <strong>The flat line is a real model, and it is the one to beat.</strong> Press
+        "predict the average" and the slope goes to zero: every home is priced at the
+        average of all of them. That is the honest baseline. It uses no information about
+        any particular home, and any model worth having has to do better than it.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 3. LEAST SQUARES ==================== -->
+  <section class="chapter" id="ols">
+    <div class="prose">
+      <h2><span class="steplabel">3</span>What "best" means: least squares</h2>
+      <p>
+        "Misses by the least" needs pinning down, because there are several ways to add up
+        misses. <strong>Ordinary least squares</strong> picks the line that minimises the
+        sum of the <em>squared</em> residuals over all <em>n</em> observations:
+      </p>
+      <div class="formula">
+        Sum of Squared Errors = <span class="sum">Σ</span><sub><em>i</em>=1</sub><sup><em>n</em></sup>
+        (<em>y</em><sub><em>i</em></sub> − <em>ŷ</em><sub><em>i</em></sub>)²
+        <span class="lbl">the quantity the slider above was driving down</span>
+      </div>
+      <p>
+        Squaring does two things. It makes a miss count the same whether the line is above
+        or below the point, and it makes a large miss count far more than a small one — a
+        residual twice as big contributes four times as much. The fitted line is therefore
+        pulled hard toward the points it is furthest from, which is worth remembering when
+        the data contain an outlier.
+      </p>
+      <p>
+        There is no searching involved. For one feature, the two numbers have a closed
+        form, and they are what the "solve it for me" button computes:
+      </p>
+      <div class="formula">
+        <span class="row"><em>b</em><sub>1</sub> =
+          <span class="frac">
+            <span><span class="sum">Σ</span><sub><em>i</em></sub><sup><em>n</em></sup> (<em>y</em><sub><em>i</em></sub> − <em>ȳ</em>)(<em>x</em><sub><em>i</em></sub> − <em>x̄</em>)</span>
+            <span><span class="sum">Σ</span><sub><em>i</em></sub><sup><em>n</em></sup> (<em>x</em><sub><em>i</em></sub> − <em>x̄</em>)²</span>
+          </span>
+        </span>
+        <span class="row"><em>b</em><sub>0</sub> = <em>ȳ</em> − <em>b</em><sub>1</sub><em>x̄</em></span>
+        <span class="lbl">x̄ and ȳ are the average feature value and the average target</span>
+      </div>
+      <p>
+        The slope is the extent to which the two variables move together, divided by how
+        much the feature varies on its own. The intercept then simply shifts the line so it
+        passes through the point that is average in both — which is why the fitted line
+        always goes through the middle of the cloud.
+      </p>
+      <details class="aside">
+        <summary>The numbers for the homes above</summary>
+        <div id="ols-work"></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ==================== 4. MORE THAN ONE FEATURE ==================== -->
+  <section class="chapter" id="many">
+    <div class="prose">
+      <h2><span class="steplabel">4</span>More than one feature</h2>
+      <p>
+        Size is not the only thing that sets a price. With <em>p</em> features the model
+        gains a slope for each one and nothing else changes:
+      </p>
+      <div class="formula">
+        <em>Y</em> = <em>b</em><sub>0</sub> + <em>b</em><sub>1</sub><em>X</em><sub>1</sub>
+        + <em>b</em><sub>2</sub><em>X</em><sub>2</sub> + ⋯
+        + <em>b</em><sub><em>p</em></sub><em>X</em><sub><em>p</em></sub> + ε
+      </div>
+      <p>
+        Each slope now answers a narrower question than it did on its own: how much the
+        price moves per unit of <em>this</em> feature, with every other feature in the
+        model held where it is.
+      </p>
+      <p>
+        A tempting next step is to read the slopes as a ranking of which features matter
+        most. That only works <strong>if the features are standardised first</strong>.
+        Raw slopes are in the units of their own feature, so the slope on size is dollars
+        per square foot and the slope on bedrooms is dollars per bedroom, and comparing
+        the two numbers compares nothing. Standardise every feature to the same scale and
+        the slopes become <em>β</em><sub>1</sub> … <em>β</em><sub><em>p</em></sub>, which
+        are comparable: the larger the <em>β</em>, the more important the predictor.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The same model, read two ways</div>
+      <div class="figure__sub">
+        One multiple regression on <span id="mr-n"></span> homes. The left column is the
+        raw slope in its own units; the right is the standardised <em>β</em>.
+      </div>
+      <div class="table-scroll">
+        <table class="data" id="mr-table"></table>
+      </div>
+      <div class="figure__note" id="mr-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="callout callout--warn">
+        <strong>Past two features you cannot draw it any more.</strong> One feature is a
+        line on a scatter plot, two is a plane, and beyond that a multiple regression model
+        has no picture. The equation is unchanged and the fitting is unchanged, but the
+        habit of checking a model by looking at it stops being available, which is part of
+        why the numerical scores in the next section matter so much.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 5. SCORING A FIT ==================== -->
+  <section class="chapter" id="score">
+    <div class="prose">
+      <h2><span class="steplabel">5</span>Scoring a fit</h2>
+      <p>
+        <strong><em>R</em>²</strong>, the coefficient of determination, is the share of the
+        target's variance the model explains — the explained variance over the total
+        variance:
+      </p>
+      <div class="formula">
+        <em>R</em>² =
+        <span class="frac">
+          <span><span class="sum">Σ</span><sub><em>i</em></sub><sup><em>n</em></sup> (<em>ŷ</em><sub><em>i</em></sub> − <em>ȳ</em>)²</span>
+          <span><span class="sum">Σ</span><sub><em>i</em></sub><sup><em>n</em></sup> (<em>y</em><sub><em>i</em></sub> − <em>ȳ</em>)²</span>
+        </span>
+        <span class="lbl">runs from 0 to 1 — the higher the better</span>
+      </div>
+      <p>
+        The other three all measure the same thing, the size of a typical miss, and differ
+        in how they punish a big one. All three run from 0 upward, and lower is better.
+      </p>
+      <div class="formula formula--left">
+        <span class="row"><b>MAE</b> =
+          <span class="frac"><span>1</span><span><em>n</em></span></span>
+          <span class="sum">Σ</span><sub><em>i</em></sub><sup><em>n</em></sup>
+          |<em>y</em><sub><em>i</em></sub> − <em>ŷ</em><sub><em>i</em></sub>|
+          <span class="muted"> &nbsp;— mean absolute error</span></span>
+        <span class="row"><b>MSE</b> =
+          <span class="frac"><span>1</span><span><em>n</em></span></span>
+          <span class="sum">Σ</span><sub><em>i</em></sub><sup><em>n</em></sup>
+          (<em>y</em><sub><em>i</em></sub> − <em>ŷ</em><sub><em>i</em></sub>)²
+          <span class="muted"> &nbsp;— mean squared error</span></span>
+        <span class="row"><b>RMSE</b> =
+          <span class="sqrt">√</span><span class="sqrt">
+          <span class="frac"><span>1</span><span><em>n</em></span></span>
+          <span class="sum">Σ</span><sub><em>i</em></sub><sup><em>n</em></sup>
+          (<em>y</em><sub><em>i</em></sub> − <em>ŷ</em><sub><em>i</em></sub>)²</span>
+          <span class="muted"> &nbsp;— root mean squared error</span></span>
+      </div>
+      <p>
+        MAE adds up the misses as they are. MSE squares them first, so one badly-priced
+        home counts for more than several slightly-off ones. RMSE is the square root of
+        MSE, which puts the number back into dollars and makes it readable — an RMSE of
+        $70,000 means the model is typically about that far out.
+      </p>
+      <p>
+        <strong>Drag the slider to make the fit worse and watch which measure reacts.</strong>
+        At zero the line is the least-squares fit. Moving right tilts it away.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Four scores, one line</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Tilt the line away from the best fit</span>
+          <input type="range" id="tilt" min="0" max="100" value="0">
+          <output id="tilt-out"></output>
+        </label>
+        <button class="btn" id="tilt-reset">Back to best</button>
+      </div>
+      <div class="split split--wide-left">
+        <div id="score-chart"></div>
+        <div class="stats stats--2" id="score-stats"></div>
+      </div>
+      <div class="figure__note" id="score-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <strong>The same formulas, applied to data the model never saw, get new names.</strong>
+        Compute MSE and RMSE on a validation or test set rather than the training set and
+        they become <strong>mean squared prediction error (MSPE)</strong> and <strong>root
+        mean squared prediction error (RMSPE)</strong>. Nothing about the arithmetic
+        changes. What changes is what the number is evidence of, and it is the second
+        number that tells you whether the model is any good — as the rest of this page is
+        about.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 6. TRADE-OFFS ==================== -->
+  <section class="chapter" id="tradeoffs">
+    <div class="prose">
+      <h2><span class="steplabel">6</span>What linear regression is good and bad at</h2>
+    </div>
+    <div class="figure" style="max-width: 52rem;">
+      <div class="figure__title">Advantages</div>
+      <div class="traits" style="margin-top:0.6rem">
+        <div class="trait trait--good">Powerful prediction<small>Often hard to beat, especially when the relationship really is close to a straight line</small></div>
+        <div class="trait trait--good">Interpretability<small>Every slope is a sentence: this much target per unit of this feature</small></div>
+        <div class="trait trait--good">Simplicity<small>A closed-form fit, nothing to tune, nothing to search</small></div>
+        <div class="trait trait--good">Feature importance<small>Standardised slopes rank the predictors directly</small></div>
+      </div>
+    </div>
+    <div class="figure" style="max-width: 52rem;">
+      <div class="figure__title">Disadvantages</div>
+      <div class="traits" style="margin-top:0.6rem">
+        <div class="trait trait--bad">Linearity assumption<small>It can only fit a straight relationship, whether or not the data have one</small></div>
+        <div class="trait trait--bad">Sensitivity to outliers<small>Squared error means one extreme point can drag the whole line</small></div>
+        <div class="trait trait--bad">Overfitting<small>Add enough features and it fits the training data beautifully and nothing else</small></div>
+      </div>
+    </div>
+    <div class="prose">
+      <h3>Other issues worth knowing before fitting</h3>
+      <ul>
+        <li><strong>Highly correlated features cause overfitting</strong>, so they should be
+          identified and removed before the model is fitted.</li>
+        <li><strong>Predictions are more reliable when the variables are roughly normally
+          distributed.</strong> Transforming a skewed variable — a log or a square root —
+          can improve the fit.</li>
+        <li><strong>Predictions are more reliable when the features are on a common scale</strong>,
+          which is what normalization and standardization are for.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ==================== 7. BIAS AND VARIANCE ==================== -->
+  <section class="chapter" id="biasvar">
+    <div class="prose">
+      <h2><span class="steplabel">7</span>Why more features can make it worse</h2>
+      <div class="callout">
+        <em>Why is linear regression giving me such good accuracy on the training set but a
+        low accuracy on the test set, despite adding all the available features to the
+        model?</em>
+      </div>
+      <p>
+        Because prediction error is not one thing. It breaks into three:
+      </p>
+    </div>
+
+    <div class="figure" style="max-width: 50rem;">
+      <div class="figure__title">Prediction error, decomposed</div>
+      <div class="split split--even" style="margin-top:0.8rem">
+        <div class="card">
+          <h3 style="color:var(--series-1)">Bias</h3>
+          <p class="small" style="margin-top:0.3rem">
+            The difference between the average prediction and the true value. A model with
+            high bias is wrong in the same direction every time, because it was never
+            flexible enough to be right.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="color:var(--series-8)">Variance</h3>
+          <p class="small" style="margin-top:0.3rem">
+            How much the predictions for a given data point swing across different
+            datasets. A model with high variance gives a different answer every time it is
+            refitted on fresh data.
+          </p>
+        </div>
+      </div>
+      <div class="card" style="margin-top:0.9rem">
+        <h3 class="muted">Noise</h3>
+        <p class="small" style="margin-top:0.3rem">
+          Unexplainable randomness in the data, and usually impossible to eliminate. It
+          sets a floor: no model, however good, predicts better than the noise allows.
+        </p>
+      </div>
+      <div class="figure__note">
+        Bias and variance are the two you can trade against each other. Noise is the one
+        you cannot.
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>
+        The trade-off is that the two move in opposite directions as a model gets more
+        complex. A simple model has high bias and low variance. A complex one has low bias
+        and high variance. The ideal model minimises both and sits in the sweet spot —
+        not too simple, not too complex — which is where total error is smallest.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The trade-off, drawn</div>
+      <div class="figure__sub">
+        Total error is the sum of the other three. It falls while bias is dropping faster
+        than variance rises, and climbs once that reverses.
+      </div>
+      <div id="bv-chart"></div>
+      <div class="legend" id="bv-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note">
+        The horizontal axis is model complexity, which on the next figure is the degree of
+        a polynomial and on the trees page is the depth of a tree.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 8. UNDER- AND OVERFITTING ==================== -->
+  <section class="chapter" id="fitting">
+    <div class="prose">
+      <h2><span class="steplabel">8</span>Under- and overfitting, on real homes</h2>
+      <p>
+        Here is a relationship a straight line genuinely cannot capture: price against the
+        age of the home, for <span id="curve-desc"></span>. Prices fall as a home ages,
+        bottom out in the middle, and recover for the oldest houses.
+      </p>
+      <p>
+        The model is a polynomial, and its <strong>degree</strong> is the complexity knob.
+        Degree 1 is a straight line. Degree 2 bends once. Degree 11 can pass exactly
+        through all twelve training homes.
+      </p>
+      <p>
+        <strong>Move the degree slider.</strong> The blue homes are the training set, which
+        the model fits. The red homes are a test set it has never seen. Watch the two error
+        numbers separate.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One knob, all three regimes</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Degree</span>
+          <input type="range" id="degree" min="1" max="11" value="1">
+          <output id="degree-out"></output>
+        </label>
+        <div class="segmented" id="regime-jump">
+          <button type="button" data-d="1">Underfit</button>
+          <button type="button" data-d="2">Good fit</button>
+          <button type="button" data-d="11">Overfit</button>
+        </div>
+      </div>
+      <div class="split split--wide-left">
+        <div id="poly-chart"></div>
+        <div>
+          <div class="stats stats--2" id="poly-stats"></div>
+          <div id="poly-verdict" class="callout" style="margin-top:0.8rem"></div>
+        </div>
+      </div>
+      <div id="poly-curve" style="margin-top:1rem"></div>
+      <div class="legend" id="poly-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="poly-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <strong>Training error alone cannot tell you any of this.</strong> It falls all the
+        way to zero as the degree climbs, and it is still falling at exactly the point
+        where the model has become worthless. The only signal that something has gone
+        wrong is the gap between the two numbers, and you only get that by holding data
+        back.
+      </div>
+      <p>
+        Both failures have a signature worth being able to recognise:
+      </p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>Regime</th><th>Training error</th><th>Test error</th><th>What went wrong</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Underfit</strong> <span class="muted">high bias</span></td>
+              <td>High</td><td>High, and close to training</td>
+              <td>The model was too simple to capture the relationship between the features and the target. It did not memorise the wrong thing; it never had the capacity to learn the right one.</td></tr>
+            <tr><td><strong>Good fit</strong></td>
+              <td>Low</td><td>Low, a little above training</td>
+              <td>Nothing. A small gap is normal: no model predicts unseen homes as well as the ones it was fitted on.</td></tr>
+            <tr><td><strong>Overfit</strong> <span class="muted">high variance</span></td>
+              <td>Effectively zero</td><td>Very high</td>
+              <td>The model was too complex. It fits the training data almost perfectly but cannot be generalized to other datasets.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 9. RIDGE ==================== -->
+  <section class="chapter" id="ridge">
+    <div class="prose">
+      <h2><span class="steplabel">9</span>Regularization, and ridge</h2>
+      <p>
+        <strong>Regularization</strong>, also called shrinkage, attacks overfitting by
+        reducing model complexity directly. Rather than removing features by hand, it
+        changes what the fitting procedure is trying to minimise, so that complexity has a
+        price. The two best-known methods are <strong>ridge</strong>, or L2
+        regularization, and <strong>lasso</strong>, or L1.
+      </p>
+      <p>
+        Ordinary least squares minimises the sum of squared errors, and that expression is
+        the <strong>loss function</strong>. Ridge adds a second term to it — a penalty on
+        the size of the coefficients, scaled by a tuning parameter λ:
+      </p>
+      <div class="formula">
+        <span class="sum">Σ</span><sub><em>i</em></sub><sup><em>n</em></sup>
+        (<em>y</em><sub><em>i</em></sub> − <em>ŷ</em><sub><em>i</em></sub>)²
+        + λ <span class="sum">Σ</span><sub><em>j</em>=1</sub><sup><em>p</em></sup>
+        <em>b</em><sub><em>j</em></sub>²
+        <span class="lbl">minimise { SSE + λ Σ <em>b<sub>j</sub></em>² }</span>
+      </div>
+      <p>
+        Now a coefficient has to earn its size. Making it larger reduces the first term and
+        increases the second, and it only survives if the error it removes is worth more
+        than the penalty it costs. Small coefficients get shrunk toward zero.
+      </p>
+      <ul>
+        <li>When <strong>λ = 0</strong> the penalty vanishes and this is exactly OLS.</li>
+        <li>As <strong>λ increases</strong>, every coefficient shrinks further toward zero.</li>
+      </ul>
+      <p>
+        <strong>Drag λ across its range.</strong> Each line is one coefficient of a
+        <span id="ridge-p"></span>-predictor model, standardised so they are comparable.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Ridge: everything shrinks, nothing leaves</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">log λ</span>
+          <input type="range" id="ridge-lam" min="0" max="59" value="0">
+          <output id="ridge-lam-out"></output>
+        </label>
+      </div>
+      <div id="ridge-chart"></div>
+      <div class="figure__note" id="ridge-note"></div>
+      <div class="chips" id="ridge-chips" style="margin-top:0.8rem"></div>
+    </div>
+
+    <div class="prose">
+      <div class="callout callout--warn">
+        <strong>Look at the count of surviving predictors as you drag.</strong> It never
+        moves. Ridge shrinks coefficients toward zero and, however large λ gets, does not
+        reach it — every predictor is still in the model, just with less to say. For a
+        model with a large number of features that is a real problem, and it is what lasso
+        exists to fix.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 10. LASSO ==================== -->
+  <section class="chapter" id="lasso">
+    <div class="prose">
+      <h2><span class="steplabel">10</span>Lasso, which throws features away</h2>
+      <p>
+        Lasso — least absolute shrinkage and selection operator — changes one thing. Where
+        ridge squares the coefficients in the penalty, lasso takes their absolute values:
+      </p>
+      <div class="formula">
+        <span class="sum">Σ</span><sub><em>i</em></sub><sup><em>n</em></sup>
+        (<em>y</em><sub><em>i</em></sub> − <em>ŷ</em><sub><em>i</em></sub>)²
+        + λ <span class="sum">Σ</span><sub><em>j</em>=1</sub><sup><em>p</em></sup>
+        |<em>b</em><sub><em>j</em></sub>|
+      </div>
+      <p>
+        That one change makes a difference out of proportion to how it looks. Squaring makes
+        the penalty on an already-small coefficient tiny, so there is almost nothing to gain
+        by pushing it the last of the way to zero. Absolute values keep the pressure
+        constant all the way down, so coefficients are forced to be
+        <strong>exactly zero</strong> — which drops those features from the model entirely
+        and leaves a simpler one behind.
+      </p>
+      <p>
+        Lasso therefore performs <strong>feature selection</strong> as part of training,
+        rather than as a separate step beforehand.
+      </p>
+      <p>
+        <strong>Drag λ again.</strong> Same data, same axes as the ridge figure above, so
+        the two can be compared directly. This time watch the predictors disappear.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Lasso: coefficients hit zero and stay there</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">log λ</span>
+          <input type="range" id="lasso-lam" min="0" max="59" value="0">
+          <output id="lasso-lam-out"></output>
+        </label>
+      </div>
+      <div id="lasso-chart"></div>
+      <div class="figure__note" id="lasso-note"></div>
+      <div class="chips" id="lasso-chips" style="margin-top:0.8rem"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint" id="lasso-keypoint"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 11. CHOOSING LAMBDA ==================== -->
+  <section class="chapter" id="lambda">
+    <div class="prose">
+      <h2><span class="steplabel">11</span>Choosing λ</h2>
+      <p>
+        λ is not something the data hand you. It is chosen, and the standard way to choose
+        it is <strong>cross-validation</strong>: split the training data into <em>k</em>
+        slices, usually 5 or 10, then for every candidate λ fit the model on all but one
+        slice and measure its MSE on the slice that was held out. Rotate through the
+        slices, average, and take the λ that minimises the average MSE.
+      </p>
+      <p>
+        The result is the curve below. Reading it is a small skill worth having:
+      </p>
+      <ul>
+        <li>The <strong>first dashed line</strong> marks the λ with the smallest MSE.</li>
+        <li>The <strong>second dashed line</strong> marks the largest λ whose MSE is still
+          within one standard error of that minimum. Its model is more constrained and
+          uses fewer features, at a cost in accuracy small enough to be inside the noise —
+          which usually makes it the easier model to interpret and the one to prefer.</li>
+      </ul>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Cross-validated MSE against λ</div>
+      <div class="figure__sub" id="cv-sub"></div>
+      <div class="controls">
+        <div class="segmented" id="cv-method">
+          <button type="button" data-m="lasso" aria-pressed="true">Lasso</button>
+          <button type="button" data-m="ridge" aria-pressed="false">Ridge</button>
+        </div>
+      </div>
+      <div id="cv-chart"></div>
+      <div class="stats" id="cv-stats" style="margin-top:1rem"></div>
+      <div class="figure__note" id="cv-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <strong>What this whole page has been building toward.</strong> Least squares finds
+        the line that fits the data in front of it best, and that is not the same as the
+        line that will predict best. The gap between those two is the bias–variance
+        trade-off, and λ is the dial that sets where on it you sit. Turning λ up
+        deliberately makes the fit to the training data worse, in exchange for a model that
+        holds up on homes it has not seen.
+      </div>
+      <p>
+        Everything here still assumes the relationship is a straight line, though. When it
+        is not — as with the price and age of a home above — no amount of tuning λ will
+        help, because the problem is the shape of the model rather than the size of its
+        coefficients. That is where
+        <a href="trees.html">decision trees and random forests</a> come in.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Course notes for EDPY 506, University of Alberta · Content follows the lectures of
+    Dr. Okan Bulut · <a href="index.html">Back to the index</a>
+  </div>
+</footer>
+
+<script type="module" src="assets/regression-page.js"></script>
+</body>
+</html>
