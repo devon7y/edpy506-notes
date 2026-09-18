@@ -6,7 +6,8 @@
   "description": "Interactive course notes for EDPY 506 Machine Learning: Theory and Applications",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --test test/*.test.mjs && python3 tools/check_pages.py",
-    "serve": "python3 -m http.server 8000"
+    "check": "node --test test/*.test.mjs && python3 tools/check_prose.py && python3 tools/check_pages.py",
+    "serve": "python3 -m http.server 8000",
+    "check:prose": "python3 tools/check_prose.py"
   }
 }

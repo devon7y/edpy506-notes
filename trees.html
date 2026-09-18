@@ -26,7 +26,7 @@
         an average within each piece. That one change buys the ability to fit curves a line
         cannot — and brings a new way to fail.
       </p>
-      <nav class="toc" aria-label="On this page">
+      <nav class="toc" aria-label="Sections">
         <a href="#why">Why not a line</a>
         <a href="#anatomy">What a tree is</a>
         <a href="#split">Choosing a split</a>
@@ -59,9 +59,10 @@
         one there is: the average of the homes that fall in it.
       </p>
       <p>
-        Here is the relationship from the <a href="regression.html#fitting">regression
-        page</a> again — price against the age of the home, for
-        <span id="curve-desc"></span> — with a straight line and a shallow tree side by side.
+        Price against the age of the home, for <span id="curve-desc"></span>, is the
+        relationship that defeated a straight line on the
+        <a href="regression.html#fitting">regression page</a>. A line and a shallow tree,
+        side by side:
       </p>
     </div>
 
@@ -374,7 +375,7 @@
     <div class="prose">
       <p>
         High variance is worth seeing rather than being told about, because it is the
-        specific weakness the next section exists to fix. <strong>Redraw the training
+        specific weakness random forests exist to fix. <strong>Redraw the training
         homes.</strong> Same underlying relationship, same settings, a different sample of
         the same size each time.
       </p>
@@ -412,7 +413,7 @@
       </p>
       <p>
         How many features each split gets to consider is usually
-        <em>m</em> ≈ <span class="sqrt">√</span><span class="sqrt"><em>p</em></span>, where
+        <em>m</em> ≈ <span class="root">√<span class="root__body"><em>p</em></span></span>, where
         <em>p</em> is the total number of features — so <em>m</em> = 4 for a set of 15 or 16
         features.
       </p>
@@ -423,9 +424,9 @@
         prediction.
       </p>
       <p>
-        This figure uses all <span id="rf-p"></span> features of the homes rather than age
-        alone, on <span id="rf-n"></span> training homes and <span id="rf-t"></span> held
-        out for testing.
+        All <span id="rf-p"></span> features of the homes are in play below rather than
+        age alone, on <span id="rf-n"></span> training homes with
+        <span id="rf-t"></span> held out for testing.
       </p>
     </div>
 
@@ -553,11 +554,11 @@
     <div class="prose">
       <div class="keypoint" id="pi-keypoint"></div>
       <p>
-        That is worth putting beside the multiple regression table on the
-        <a href="regression.html#many">regression page</a>. Least squares handed every one
-        of those same do-nothing predictors a non-zero coefficient and no way to tell it
-        apart from a real one. Permutation importance asks a blunter question — does the
-        model get worse without it — and the do-nothing predictors answer it honestly.
+        The <a href="regression.html#many">multiple regression table</a> is the contrast.
+        Least squares handed every one of those same do-nothing predictors a non-zero
+        coefficient, with no way to tell one apart from a real one. Permutation importance
+        asks a blunter question — does the model get worse without it — and a predictor
+        that does nothing cannot fake an answer to it.
       </p>
     </div>
   </section>
@@ -567,7 +568,7 @@
 
 <footer class="footer">
   <div class="wrap">
-    Course notes for EDPY 506, University of Alberta · Content follows the lectures of
+    EDPY 506, University of Alberta · Content follows the lectures of
     Dr. Okan Bulut · <a href="index.html">Back to the index</a>
   </div>
 </footer>

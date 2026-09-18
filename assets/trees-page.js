@@ -5,6 +5,7 @@
 import {
   initChrome, svgRoot, frame, scale, linePath, el, responsive, token, tooltip,
   mean, money, money1k, fmt, rng, clipRect, directLabels, shuffle,
+  tweenInput, tweenInputs,
 } from './site.js';
 import { ols, metrics } from './linreg.js';
 import {
@@ -20,8 +21,8 @@ const tip = tooltip();
 const k$ = money1k;
 const rmseOf = (predict, X, y) => Math.sqrt(mseOf(predict, X, y));
 
-/* One-feature data (price against age) for sections 1 to 7, and the full
-   feature set for the forest and importance sections. */
+/* One-feature data (price against age) for the single-tree figures, and the
+   full feature set for the forest and importance figures. */
 const AGE_TRAIN = pairs(ds, 'curved', 21, 40);
 const AGE_TEST = pairs(ds, 'curved', 22, 40);
 const Xtr = AGE_TRAIN.xs.map((x) => [x]);
@@ -152,7 +153,7 @@ function stepPath(tree, sx, sy, lo = 0, hi = 80, steps = 400) {
   return linePath(pts);
 }
 
-/** The scatter that most figures on this page sit on. */
+/** The price-against-age scatter most of the single-tree figures sit on. */
 function ageScatter(host, w, h, draw, opts = {}) {
   const { showTest = true, yPad = 40000 } = opts;
   const pad = { l: 62, r: 14, t: 14, b: 40 };
@@ -390,9 +391,10 @@ const testDots = (g, sx, sy) => AGE_TEST.xs.forEach((x, i) => el('circle', {
   };
 
   atEl.addEventListener('input', update);
-  document.getElementById('split-best').addEventListener('click', () => {
-    atEl.value = BEST.t; update();
-  });
+  /* Sweeping the split across the range traces the SSE curve underneath it,
+     which is the search the tree performs. */
+  document.getElementById('split-best').addEventListener('click', () =>
+    tweenInput(atEl, BEST.t, update, { ms: 900 }));
   responsive(host, update);
   responsive(sseHost, drawSse);
 }
@@ -554,7 +556,8 @@ const DEPTH_BEST = DEPTH_FITS.reduce((a, b) => (b.test < a.test ? b : a));
   };
 
   aEl.addEventListener('input', update);
-  document.getElementById('alpha-best').addEventListener('click', () => { aEl.value = iBest; update(); });
+  document.getElementById('alpha-best').addEventListener('click', () =>
+    tweenInput(aEl, iBest, update, { ms: 900 }));
   responsive(chartHost, update);
 }
 
@@ -611,9 +614,9 @@ const DEPTH_BEST = DEPTH_FITS.reduce((a, b) => (b.test < a.test ? b : a));
   };
 
   for (const e of Object.values(els)) e.addEventListener('input', update);
-  document.getElementById('h-defaults').addEventListener('click', () => {
-    els.depth.value = 10; els.split.value = 2; els.leaf.value = 1; update();
-  });
+  document.getElementById('h-defaults').addEventListener('click', () => tweenInputs([
+    { el: els.depth, to: 10 }, { el: els.split, to: 2 }, { el: els.leaf, to: 1 },
+  ], update));
   responsive(chartHost, update);
 }
 
@@ -830,7 +833,8 @@ document.getElementById('rf-mtry').value = SQRT_P;
     + `and every prediction it made could be read off as a short list of questions. This forest `
     + `is ${RF_MAX_TREES} trees, each grown to depth ${treeDepth(forestFor(SQRT_P).rf.trees[0])} or so on a different `
     + `resample of the homes, and a prediction is the average of ${RF_MAX_TREES} separate walks. `
-    + `There is no diagram of it. That is the trade the next section is a response to.`;
+    + `There is no diagram of it, which is why `
+    + `<a href="#importance">variable importance</a> has to be measured rather than read off.`;
 }
 
 /* ===================================================================

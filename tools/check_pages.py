@@ -107,9 +107,10 @@ async def browser_checks(pages):
 
 
 def main():
+    # The instructor's demos are reference material in the working directory,
+    # gitignored by the same pattern, and not part of the site.
     pages = sys.argv[1:] or sorted(
-        p.name for p in ROOT.glob("*.html")
-        if not p.name.endswith("Demo.html") and "Demo_" not in p.name)
+        p.name for p in ROOT.glob("*.html") if "demo" not in p.name.lower())
     print(f"checking: {', '.join(pages)}")
 
     problems = static_checks(pages)

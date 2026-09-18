@@ -22,11 +22,10 @@
       <p class="eyebrow">Topic 1</p>
       <h1>Regression</h1>
       <p class="lede">
-        Predicting a number. This page starts with the single straight line that fits a
-        set of homes best, and ends with the reason you would deliberately choose a line
-        that fits them worse.
+        Predicting a number. From the single straight line that fits a set of homes
+        best, to the reason you would deliberately choose a line that fits them worse.
       </p>
-      <nav class="toc" aria-label="On this page">
+      <nav class="toc" aria-label="Sections">
         <a href="#what">What makes it regression</a>
         <a href="#line">Fitting a line</a>
         <a href="#ols">Least squares</a>
@@ -69,9 +68,8 @@
         Regression algorithms worth naming, all of which do the same job in different
         ways: linear regression, simple and multiple; regularized regression, meaning
         ridge and lasso; decision trees and random forests; support vector machines; and
-        k-nearest neighbours. The first four are on this site. This page covers linear and
-        regularized regression, and <a href="trees.html">trees and forests</a> have their
-        own page.
+        k-nearest neighbours. Linear and regularized regression are below;
+        <a href="trees.html">trees and forests</a> have their own page.
       </p>
     </div>
 
@@ -150,7 +148,7 @@
         <strong>The flat line is a real model, and it is the one to beat.</strong> Press
         "predict the average" and the slope goes to zero: every home is priced at the
         average of all of them. That is the honest baseline. It uses no information about
-        any particular home, and any model worth having has to do better than it.
+        any particular home, and a useful model has to do better than it.
       </div>
     </div>
   </section>
@@ -173,8 +171,8 @@
         Squaring does two things. It makes a miss count the same whether the line is above
         or below the point, and it makes a large miss count far more than a small one — a
         residual twice as big contributes four times as much. The fitted line is therefore
-        pulled hard toward the points it is furthest from, which is worth remembering when
-        the data contain an outlier.
+        pulled hard toward the points it is furthest from, which is how a single outlier
+        drags a whole line.
       </p>
       <p>
         There is no searching involved. For one feature, the two numbers have a closed
@@ -250,7 +248,8 @@
         line on a scatter plot, two is a plane, and beyond that a multiple regression model
         has no picture. The equation is unchanged and the fitting is unchanged, but the
         habit of checking a model by looking at it stops being available, which is part of
-        why the numerical scores in the next section matter so much.
+        why a model of more than two features can only be judged by its numerical
+        scores.
       </div>
     </div>
   </section>
@@ -288,10 +287,9 @@
           (<em>y</em><sub><em>i</em></sub> − <em>ŷ</em><sub><em>i</em></sub>)²
           <span class="muted"> &nbsp;— mean squared error</span></span>
         <span class="row"><b>RMSE</b> =
-          <span class="sqrt">√</span><span class="sqrt">
-          <span class="frac"><span>1</span><span><em>n</em></span></span>
-          <span class="sum">Σ</span><sub><em>i</em></sub><sup><em>n</em></sup>
-          (<em>y</em><sub><em>i</em></sub> − <em>ŷ</em><sub><em>i</em></sub>)²</span>
+          <span class="radical radical--tall"><span class="radical__sign">√</span><span class="radical__body"><span class="frac"><span>1</span><span><em>n</em></span></span>
+            <span class="sum">Σ</span><sub><em>i</em></sub><sup><em>n</em></sup>
+            (<em>y</em><sub><em>i</em></sub> − <em>ŷ</em><sub><em>i</em></sub>)²</span></span>
           <span class="muted"> &nbsp;— root mean squared error</span></span>
       </div>
       <p>
@@ -329,8 +327,7 @@
         they become <strong>mean squared prediction error (MSPE)</strong> and <strong>root
         mean squared prediction error (RMSPE)</strong>. Nothing about the arithmetic
         changes. What changes is what the number is evidence of, and it is the second
-        number that tells you whether the model is any good — as the rest of this page is
-        about.
+        number that tells you whether the model is any good.
       </div>
     </div>
   </section>
@@ -358,7 +355,7 @@
       </div>
     </div>
     <div class="prose">
-      <h3>Other issues worth knowing before fitting</h3>
+      <h3>Other issues, before fitting</h3>
       <ul>
         <li><strong>Highly correlated features cause overfitting</strong>, so they should be
           identified and removed before the model is fitted.</li>
@@ -447,9 +444,9 @@
     <div class="prose">
       <h2><span class="steplabel">8</span>Under- and overfitting, on real homes</h2>
       <p>
-        Here is a relationship a straight line genuinely cannot capture: price against the
-        age of the home, for <span id="curve-desc"></span>. Prices fall as a home ages,
-        bottom out in the middle, and recover for the oldest houses.
+        Price against the age of the home, for <span id="curve-desc"></span>, is a
+        relationship a straight line cannot capture. Prices fall as a home ages, bottom
+        out in the middle, and recover for the oldest houses.
       </p>
       <p>
         The model is a polynomial, and its <strong>degree</strong> is the complexity knob.
@@ -497,7 +494,7 @@
         back.
       </div>
       <p>
-        Both failures have a signature worth being able to recognise:
+        Each failure has its own signature:
       </p>
       <div class="table-scroll">
         <table class="data data--prose">
@@ -642,7 +639,7 @@
         slices, average, and take the λ that minimises the average MSE.
       </p>
       <p>
-        The result is the curve below. Reading it is a small skill worth having:
+        The result is a curve with two marked values on it:
       </p>
       <ul>
         <li>The <strong>first dashed line</strong> marks the λ with the smallest MSE.</li>
@@ -680,8 +677,8 @@
         Everything here still assumes the relationship is a straight line, though. When it
         is not — as with the price and age of a home above — no amount of tuning λ will
         help, because the problem is the shape of the model rather than the size of its
-        coefficients. That is where
-        <a href="trees.html">decision trees and random forests</a> come in.
+        coefficients. <a href="trees.html">Decision trees and random forests</a> drop
+        that assumption.
       </p>
     </div>
   </section>
@@ -691,7 +688,7 @@
 
 <footer class="footer">
   <div class="wrap">
-    Course notes for EDPY 506, University of Alberta · Content follows the lectures of
+    EDPY 506, University of Alberta · Content follows the lectures of
     Dr. Okan Bulut · <a href="index.html">Back to the index</a>
   </div>
 </footer>

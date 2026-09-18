@@ -6,7 +6,7 @@
 import {
   initChrome, svgRoot, frame, scale, linePath, el, responsive, token, tooltip,
   clientToViewBox, mean, sd, money, money1k, fmt, rng, gauss, clipRect,
-  directLabels, scaledTicks,
+  directLabels, scaledTicks, tweenInput, tweenInputs,
 } from './site.js';
 import {
   ols, metrics, lstsq, polyfit, standardize, regPath, crossValidate, logGrid,
@@ -177,15 +177,19 @@ const LINE_BEST = metrics(LINE.ys, LINE.xs.map((x) => LINE_FIT.b0 + LINE_FIT.b1 
 
   b0El.addEventListener('input', update);
   b1El.addEventListener('input', update);
+  /* Both sliders travel together, so the line rotates and slides into place and
+     the total error can be watched falling as it goes. */
   document.getElementById('solve').addEventListener('click', () => {
-    b0El.value = Math.round(LINE_FIT.b0 / 5000) * 5000;
-    b1El.value = Math.round(LINE_FIT.b1 / 5) * 5;
-    update();
+    tweenInputs([
+      { el: b0El, to: Math.round(LINE_FIT.b0 / 5000) * 5000 },
+      { el: b1El, to: Math.round(LINE_FIT.b1 / 5) * 5 },
+    ], update);
   });
   document.getElementById('flat').addEventListener('click', () => {
-    b0El.value = Math.round(mean(LINE.ys) / 5000) * 5000;
-    b1El.value = 0;
-    update();
+    tweenInputs([
+      { el: b0El, to: Math.round(mean(LINE.ys) / 5000) * 5000 },
+      { el: b1El, to: 0 },
+    ], update);
   });
   responsive(host, update);
 }
@@ -253,18 +257,20 @@ const MR_N = 150;
     + `<b>${top}</b> comes out the strongest predictor. `
     + `Read the raw column instead and the ranking is different and meaningless, because `
     + `each row is in its own units.<br><br>`
-    + `Now look at the bottom of the table. These homes were generated so that door colour `
-    + `and the house number have <b>no effect on price whatsoever</b>, and the model still `
+    + `At the bottom of the table sit door colour and the house number. These homes were `
+    + `generated so that neither has <b>any effect on price whatsoever</b>, and the model still `
     + `hands them coefficients — the largest is ${money(worstNoise)}. Least squares gives every `
     + `feature it is offered a non-zero slope, because a coefficient of exactly zero is `
     + `almost never the arrangement that minimises squared error on a finite sample. `
-    + `That is the overfitting problem in miniature, and sections 9 to 11 are about fixing it.`
-    + `<br><br>One row is worth singling out. <b>Age</b> sits down among the noise with a `
+    + `That is the overfitting problem in miniature, and <a href="#ridge">regularization</a> `
+    + `is the fix.`
+    + `<br><br><b>Age</b> sits down among the noise too, with a `
     + `<em>β</em> of ${money(beta[names.indexOf('Age (years)')])}, and age genuinely does move `
     + `the price of these homes — a lot. A linear model cannot see it, because the effect is `
     + `not a straight line: prices fall with age, bottom out, then recover, and a single slope `
-    + `through that shape averages out to almost nothing. Section 8 draws it, and `
-    + `<a href="trees.html">the trees page</a> is about models that can fit it.`;
+    + `through that shape averages out to almost nothing. `
+    + `<a href="#fitting">The polynomial figure</a> draws that curve, and `
+    + `<a href="trees.html">trees and forests</a> fit it.`;
 }
 
 /* ===================================================================
@@ -344,7 +350,7 @@ const MR_N = 150;
   };
 
   tiltEl.addEventListener('input', update);
-  document.getElementById('tilt-reset').addEventListener('click', () => { tiltEl.value = 0; update(); });
+  document.getElementById('tilt-reset').addEventListener('click', () => tweenInput(tiltEl, 0, update));
   responsive(host, update);
 }
 
@@ -600,8 +606,11 @@ const BV = (() => {
   };
 
   degEl.addEventListener('input', update);
+  /* Stepping through the degrees rather than jumping is the whole point of these
+     three buttons: the curve visibly stiffens on the way down to 1 and visibly
+     tears itself apart on the way up to 11. */
   document.querySelectorAll('#regime-jump button').forEach((b) =>
-    b.addEventListener('click', () => { degEl.value = b.dataset.d; update(); }));
+    b.addEventListener('click', () => tweenInput(degEl, +b.dataset.d, update, { ms: 900 })));
   responsive(host, update);
   responsive(curveHost, drawCurves);
 }
@@ -740,9 +749,9 @@ pathFigure('lasso', { chart: 'lasso-chart', slider: 'lasso-lam', out: 'lasso-lam
   const bMin = REG.paths.lasso[cvL.iMin], b1se = REG.paths.lasso[cvL.i1se];
   const live = (b) => b.filter((v) => Math.abs(v) > 1e-9).length;
   document.getElementById('lasso-keypoint').innerHTML =
-    `<strong>This is the difference that matters.</strong> Ridge keeps all `
-    + `${REG.names.length} predictors at every λ. Lasso, at the λ cross-validation picks in `
-    + `the next section, keeps <b>${live(b1se)}</b> — and it drops `
+    `<strong>The difference that matters.</strong> Ridge keeps all `
+    + `${REG.names.length} predictors at every λ. Lasso, at the λ that `
+    + `<a href="#lambda">cross-validation</a> picks, keeps <b>${live(b1se)}</b> — and it drops `
     + `${REG.noise.filter(Boolean).length - b1se.filter((v, j) => REG.noise[j] && Math.abs(v) > 1e-9).length} `
     + `of the ${REG.noise.filter(Boolean).length} predictors that genuinely have no relationship `
     + `with price. A model with fewer predictors in it is also a model someone can read.`;

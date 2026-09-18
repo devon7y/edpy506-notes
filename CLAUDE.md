@@ -82,8 +82,9 @@ assets/
   trees.js            CART, pruning, random forest, permutation importance
   regression-page.js  every figure on regression.html
   trees-page.js       every figure on trees.html
-test/                 node unit tests for linreg.js and trees.js
+test/                 node tests: the maths, and the pages' structure
 tools/check_pages.py  browser check: errors, empty figures, overflow, id clashes
+tools/check_prose.py  flags metadiscourse in the pages and the page scripts
 ```
 
 The maths modules (`linreg.js`, `trees.js`) import nothing but `site.js` and
@@ -103,10 +104,24 @@ gitignored rather than merely untracked.
 ## Checks
 
 ```bash
-npm test          # node unit tests for the maths
-npm run check     # unit tests, then every page in a real browser
-npm run serve     # http://localhost:8000
+npm test            # node unit tests for the maths
+npm run check       # unit tests, prose audit, then every page in a real browser
+npm run check:prose # the prose audit alone
+npm run serve       # http://localhost:8000
 ```
+
+`tools/check_prose.py` flags the mechanical cases of the six rules below. It
+cannot catch all of them and it is occasionally wrong, so treat a hit as a
+prompt to reread the sentence rather than a verdict.
+
+`test/pages.test.mjs` runs without a browser and takes a second. It parses every
+inline and external module, checks that a page importing `initChrome` calls it,
+that every in-page anchor resolves, and that every page carries the top bar and
+theme toggle the shared CSS expects. It is ported from the Classifiers site,
+where a broken module shipped to production: the HTML rendered, the prose read
+correctly, and only the figures were missing, so a screenshot of the text looked
+perfect. `check_pages.py` catches that too but needs a browser and forty
+seconds, which is why the fast version exists.
 
 `tools/check_pages.py` needs playwright (`pip install playwright && playwright
 install chromium`). It loads each page in light and dark, drives every slider
@@ -138,17 +153,66 @@ The site must be **served**, not opened as `file://`: the pages are ES modules.
   drops onto the baseline.
 - **Prefer a `<section id>` name that no control uses.** See rule in
   `check_pages.py`.
+- **A button that jumps a control to a computed answer animates there.** Use
+  `tweenInput` or `tweenInputs` from `site.js`, never `el.value = x`. Watching
+  the error fall as the line rotates into place is the demonstration; assigning
+  the answer shows a before and an after and leaves the path to be inferred. The
+  helper honours `prefers-reduced-motion` and cancels itself if the reader grabs
+  the control.
 
-## Style
+## Writing style
 
-Prose is written for someone taking the course, not for someone who already
-knows the answer. Explain the mechanism, then show it, then say what the figure
-showed. Say what a model cannot do as plainly as what it can.
+The audience is a student taking the course, not someone who already knows the
+answer. Explain the mechanism, show it, then say what the figure showed. State
+what a model cannot do as plainly as what it can. Course terms appear in bold on
+first use and match the lectures' wording, so the site and the slides can be read
+together. Sentences are short and carry one idea. An em dash is the house
+punctuation for an aside.
 
-Course terms appear in bold on first use and match the lectures' wording, so
-the site and the slides can be read together. Sentences are short and carry one
-idea. An em dash is the house punctuation for an aside; the pages use them
-freely and consistently, and should keep doing so.
+### Write about the subject, not about the writing
+
+The standing failure mode here is **metadiscourse**: sentences whose topic is
+the site rather than regression, trees, or what a figure shows. It taxes every
+reader, helps none, and rots silently. "The next section covers pruning" survives
+that section being moved, renamed or cut, whereas a broken link announces itself.
+
+Six things not to write, on any surface:
+
+1. **Narrative pointers.** No "the next section explains", "as we will see",
+   "covered further down", "recall from earlier", "sections 9 to 11 are about
+   fixing it". Say the thing, or let the other place say it. Pointers to
+   *artifacts* are fine and often required — a real `<a href>` to
+   `regression.html#lasso`, a figure's own title, `assets/trees.js` — because
+   they name something checkable that breaks loudly when it moves.
+2. **Position narration.** No "Now", "First we", "Start with", "Here is", "Having
+   established". The reader can see where they are.
+3. **Self-justification.** No "it is worth noting", "importantly", "worth
+   remembering", "two things worth noticing". If a passage is not worth writing,
+   cut it; if it is, write it.
+4. **Artifact self-reference.** No "this page", "this site", "this figure", "the
+   present example". Name the subject. A caption describes the homes and the fit,
+   not the figure it sits under.
+5. **Claims of your own rigour.** No "carefully measured", "genuinely computed",
+   "honestly". Give the number and the method and let the reader judge.
+   Performing rigour is the same defect as performing confidence.
+6. **Borrowed timelines.** A static subject does not unfold. Coefficients do not
+   "emerge", assumptions do not "come back". They differ, they are, they hold. A
+   quantity plotted against a parameter may still rise and fall, because that is
+   a real function of a real axis.
+
+Two tests. Does the sentence make a claim about the subject or about the
+document? Cut the second kind. And would it survive a reader arriving at that
+paragraph from a search result, not knowing what precedes it?
+
+Per surface: **commits** say what changed and why, not the order things were
+tried in; **code comments** explain why a line exists, not what the next one
+does; a **figure note** states what the numbers show, not what the reader is
+about to be shown. Cross-links between topic pages are real `<a href>` anchors,
+which makes them the allowed kind of pointer.
+
+Most of the prose on this site is assembled in `assets/*-page.js` rather than
+written in the HTML, so audit both. Deleting metadiscourse usually shortens the
+text and never costs information, because it carried none.
 
 ## What is not in the repository
 

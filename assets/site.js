@@ -149,6 +149,88 @@ export function initChrome() {
   initTheme();
 }
 
+/* ---------- animating a control to a computed value ---------- */
+
+/**
+ * Move one or more range inputs to target values over time, calling `update`
+ * on every frame.
+ *
+ * A "solve it for me" button that assigns the answer teaches nothing: the
+ * reader sees a before and an after and has to infer the path. Sweeping the
+ * control there shows the error falling as the line rotates into place, which
+ * is the thing the button is meant to demonstrate.
+ *
+ * `items` is [{ el, to }]. Returns a cancel function. Any tween already running
+ * on one of these inputs is cancelled first, so repeated clicks do not fight,
+ * and a tween cancels itself if the reader grabs the control mid-flight.
+ */
+const running = new WeakMap();
+
+export function tweenInputs(items, update, opts = {}) {
+  for (const { el: input } of items) running.get(input)?.();
+
+  const from = items.map(({ el: input }) => +input.value);
+  const spans = items.map(({ el: input, to }, i) => {
+    const lo = +input.min || 0;
+    const hi = +input.max || 1;
+    return Math.abs(to - from[i]) / (hi - lo || 1);
+  });
+  const reach = Math.max(0, ...spans);
+
+  const settle = () => {
+    items.forEach(({ el: input, to }) => { input.value = to; });
+    update();
+  };
+
+  /* Honour the reader's own setting rather than overriding it. */
+  if (reach === 0 || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    settle();
+    return () => {};
+  }
+
+  /* A short hop should not take as long as a sweep across the whole range. */
+  const ms = opts.ms ?? Math.min(750, Math.max(260, 260 + 520 * reach));
+  const step = items.map(({ el: input }) => +input.step || 1);
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+
+  let raf = null;
+  const start = performance.now();
+  const cancel = () => {
+    cancelAnimationFrame(raf);
+    items.forEach(({ el: input }) => {
+      input.removeEventListener('pointerdown', cancel);
+      input.removeEventListener('input', onInput);
+      running.delete(input);
+    });
+  };
+  /* Only a real pointer or keyboard interaction stops it; the tween's own
+     writes dispatch no input event, so this cannot cancel itself. */
+  const onInput = (ev) => { if (ev.isTrusted) cancel(); };
+  items.forEach(({ el: input }) => {
+    running.set(input, cancel);
+    input.addEventListener('pointerdown', cancel);
+    input.addEventListener('input', onInput);
+  });
+
+  const frame = (now) => {
+    const t = Math.min(1, (now - start) / ms);
+    const k = ease(t);
+    items.forEach(({ el: input, to }, i) => {
+      const v = from[i] + (to - from[i]) * k;
+      input.value = Math.round(v / step[i]) * step[i];
+    });
+    update();
+    if (t < 1) raf = requestAnimationFrame(frame);
+    else { cancel(); settle(); opts.done?.(); }
+  };
+  raf = requestAnimationFrame(frame);
+  return cancel;
+}
+
+/** One input, which is the common case. */
+export const tweenInput = (input, to, update, opts) =>
+  tweenInputs([{ el: input, to }], update, opts);
+
 /* ---------- tooltip ---------- */
 
 let tipEl = null;

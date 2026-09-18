@@ -1,11 +1,11 @@
-# EDPY 506 — interactive course notes
+# EDPY 506 — an interactive companion
 
 **Live at <https://devon7y.github.io/edpy506-notes/>**
 
-Study notes for **EDPY 506 Machine Learning: Theory and Applications**
-(University of Alberta), rebuilt as pages you can interact with. Every model
-the course covers gets a page, a figure whose parameter you can drag, and an
-account of what happens when you do.
+An interactive companion to **EDPY 506 Machine Learning: Theory and
+Applications** (University of Alberta). Every model the course covers gets a
+page, a figure whose parameter you can drag, and an account of what happens
+when you do.
 
 **Topics so far**
 
@@ -31,7 +31,7 @@ directly, so run `npm run check` before pushing.
 
 ```bash
 npm test        # unit tests for the regression and tree implementations
-npm run check   # those, then every page loaded and driven in a real browser
+npm run check   # those, a prose audit, then every page driven in a real browser
 ```
 
 The browser check needs playwright:
