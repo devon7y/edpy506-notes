@@ -11,6 +11,7 @@ export const CHAPTERS = [
   { href: 'index.html', short: 'Start', title: 'EDPY 506' },
   { href: 'regression.html', short: 'Regression', title: 'Regression' },
   { href: 'trees.html', short: 'Trees & forests', title: 'Decision trees and random forests' },
+  { href: 'classification.html', short: 'Classification', title: 'Classification' },
 ];
 
 /* Standalone pages that are not part of the topic sequence, shown in a

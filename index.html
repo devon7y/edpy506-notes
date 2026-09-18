@@ -89,6 +89,7 @@ initChrome();
 const blurbs = {
   'regression.html': 'Fitting a line by least squares, scoring it with R² and RMSE, watching it overfit, and reining it back in with ridge and lasso.',
   'trees.html': 'Splitting the data instead of fitting a line: where a split comes from, why deep trees overfit, pruning, forests, and which predictors actually mattered.',
+  'classification.html': 'Predicting a category instead of a number: logistic regression, k-nearest neighbours, support vector machines, and the measures that say whether a classifier is any good.',
 };
 document.getElementById('topic-cards').innerHTML = CHAPTERS
   .filter((c) => c.href !== 'index.html')

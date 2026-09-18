@@ -80,7 +80,7 @@ async def browser_checks(pages):
 
                 empty = await pg.evaluate(
                     """() => [...document.querySelectorAll('.figure')]
-                        .filter(f => !f.querySelector('svg, table, .traits, .card, ul, .bars'))
+                        .filter(f => !f.querySelector('svg, table, .traits, .card, ul, .bars, .stat, .cm'))
                         .map(f => (f.querySelector('.figure__title') || {}).textContent)""")
                 if empty:
                     errs.append(f"figures rendered empty: {empty}")

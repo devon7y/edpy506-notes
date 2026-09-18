@@ -45,7 +45,13 @@ garage, distance to LRT, front door colour, house number, odd/even). It is
 generated in `assets/datasets.js` from a seeded RNG, so the site draws the same
 homes on every visit.
 
-Three properties of it are load-bearing, and changing any of them breaks pages:
+The same rows carry **two targets**. `target` is the price, which makes a
+regression problem. `classification` is whether the home sold inside thirty
+days, which makes a classification problem on identical features. The index page
+introduces both, and `classDesign` / `labelled` in `datasets.js` build the
+matrices for the second.
+
+Four properties of it are load-bearing, and changing any of them breaks pages:
 
 - **Price is additive in the features, except age.** Age is quadratic: prices
   fall, bottom out around 42 years, and recover. That single curve is what the
@@ -57,6 +63,12 @@ Three properties of it are load-bearing, and changing any of them breaks pages:
   correctly finding them worthless. That contrast is the point of both.
 - **Noise has a standard deviation of $20,000.** That is the floor on test
   error, and several notes quote it.
+- **Selling inside thirty days is a logistic function of two things**: how far
+  the asking price sits above or below the home's value (`over`), and the
+  distance to the LRT. The classification page's every figure rests on that,
+  and the separable subset used by the SVM figure is built by labelling the
+  confident rows by which side of that rule they fall on rather than by the coin
+  the sampler flipped, so it is separable by construction.
 
 ### Adding another dataset later
 
@@ -74,14 +86,17 @@ figures stops being true.
 index.html            landing page and the running example
 regression.html       topic 1
 trees.html            topic 2
+classification.html   topic 3
 assets/
   site.css            design tokens, layout, components — light and dark
   site.js             chrome (nav, theme, pager), SVG helpers, small stats, RNG
   datasets.js         the homes, and the encodings each model needs
   linreg.js           OLS, metrics, polyfit, ridge, lasso, cross-validation
   trees.js            CART, pruning, random forest, permutation importance
+  classify.js         logistic regression, KNN, SVM, confusion matrix, ROC/AUC
   regression-page.js  every figure on regression.html
   trees-page.js       every figure on trees.html
+  classification-page.js  every figure on classification.html
 test/                 node tests: the maths, and the pages' structure
 tools/check_pages.py  browser check: errors, empty figures, overflow, id clashes
 tools/check_prose.py  flags metadiscourse in the pages and the page scripts
@@ -153,6 +168,13 @@ The site must be **served**, not opened as `file://`: the pages are ES modules.
   drops onto the baseline.
 - **Prefer a `<section id>` name that no control uses.** See rule in
   `check_pages.py`.
+- **A solver has to actually converge before its picture is drawn.** The SVM is
+  fitted by full SMO with an error cache rather than the simplified variant,
+  because the simplified one gives up when a randomly chosen partner makes no
+  progress and stops short of the maximal margin. A margin that is nearly widest
+  looks wrong the moment it is drawn next to the claim that nothing beats it.
+  `test/classify.test.mjs` checks that claim by rotating and shifting the
+  boundary and confirming no alternative separator has a wider margin.
 - **A button that jumps a control to a computed answer animates there.** Use
   `tweenInput` or `tweenInputs` from `site.js`, never `el.value = x`. Watching
   the error fall as the line rotates into place is the demonstration; assigning

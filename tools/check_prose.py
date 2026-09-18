@@ -39,8 +39,9 @@ RULES = [
      r"|\bthe story (?:so far|of)\b|\bour journey\b"),
 ]
 
-TARGETS = ["index.html", "regression.html", "trees.html",
-           "assets/regression-page.js", "assets/trees-page.js"]
+TARGETS = ["index.html", "regression.html", "trees.html", "classification.html",
+           "assets/regression-page.js", "assets/trees-page.js",
+           "assets/classification-page.js"]
 
 
 def prose_of(path: Path) -> str:

@@ -69,6 +69,16 @@ export const NEIGH_PREMIUM = [-55000, -35000, 20000, 65000, 130000, 155000];
 export const GARAGE_PREMIUM = [0, 12000, 26000];
 const ageEffect = (age) => -2600 * age + 31 * age * age;
 
+/* How fast a home sells is a different question from what it is worth, and it
+   turns on a different number: what the seller is asking relative to what the
+   home is actually worth. A home priced under the local going rate goes
+   quickly; one priced over it sits. Being near transit helps. Nothing else
+   does, and the same three noise columns do nothing here either.
+
+   `over` is that asking price as a percentage above or below the home's value,
+   which is the single feature the logistic curve is drawn against. */
+const DAYS_LOGIT = (over, lrt) => -0.26 * over - 0.42 * (lrt - 4);
+
 function priceOf(r, noise) {
   return 60000
     + 205 * r.size
@@ -104,6 +114,12 @@ function sampleEdmonton(seed = 1, n = 120, fixed = {}) {
     r.odd = r.houseNum % 2;
     r.addr = `${r.houseNum} ${STREETS[Math.floor(rand() * STREETS.length)]}`;
     r.price = priceOf(r, 20000 * gauss(rand));
+
+    /* Asking price, and whether it sold inside thirty days. */
+    r.over = num('over', () => Math.max(-22, Math.min(26, 8.5 * gauss(rand))));
+    r.asking = r.price * (1 + r.over / 100);
+    r.pFast = 1 / (1 + Math.exp(-DAYS_LOGIT(r.over, r.lrt)));
+    r.fast = rand() < r.pFast ? 1 : 0;
     rows.push(r);
   }
   return rows;
@@ -118,6 +134,33 @@ export const DATASETS = {
     target: { key: 'price', label: 'Price', unit: '$', fmt: money, short: (v) => `$${Math.round(v / 1000)}k` },
     features: FEATURES,
     sample: sampleEdmonton,
+    /* The second question these same homes can be asked. The target is a
+       category, so it is a classification problem on identical rows. */
+    classification: {
+      key: 'fast',
+      label: 'Sold within thirty days',
+      classes: ['Still listed', 'Sold in 30 days'],
+      positive: 1,
+      features: [
+        { key: 'over', label: 'Asking price vs. local rate', short: 'Over/under', unit: '%',
+          type: 'numeric', fmt: (v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}%` },
+        { key: 'lrt', label: 'Distance to LRT', short: 'LRT km', unit: 'km',
+          type: 'numeric', fmt: (v) => v.toFixed(1) },
+        { key: 'size', label: 'Size', short: 'Sq ft', unit: 'sq ft', type: 'numeric',
+          fmt: (v) => Math.round(v).toLocaleString('en-CA') },
+        { key: 'beds', label: 'Bedrooms', short: 'Beds', type: 'numeric', fmt: int },
+        { key: 'age', label: 'Age', short: 'Age', unit: 'years', type: 'numeric', fmt: int },
+        { key: 'door', label: 'Front door colour', short: 'Door', type: 'categorical',
+          levels: DOORS, noise: true },
+        { key: 'odd', label: 'Odd or even number', short: 'Odd/even', type: 'categorical',
+          levels: ['Even', 'Odd'], noise: true },
+      ],
+      /* One feature for the logistic curve, two for the 2-D boundaries. */
+      views: {
+        curve: { x: 'over' },
+        plane: { x: 'over', y: 'lrt' },
+      },
+    },
     views: {
       linear: { x: 'size' },
       curved: {
@@ -189,6 +232,25 @@ export function treeDesign(ds, rows) {
     y: rows.map((r) => r[ds.target.key]),
     names: ds.features.map((f) => f.label),
     features: ds.features,
+  };
+}
+
+/** Rows plus the 0/1 label, for the classification page. */
+export function labelled(ds, seed, n, fixed = {}) {
+  const c = ds.classification;
+  const rows = ds.sample(seed, n, fixed);
+  return { rows, y: rows.map((r) => r[c.key]), spec: c };
+}
+
+/** A design matrix over the named classification features. */
+export function classDesign(ds, rows, keys = null) {
+  const c = ds.classification;
+  const feats = keys ? c.features.filter((f) => keys.includes(f.key)) : c.features;
+  return {
+    X: rows.map((r) => feats.map((f) => r[f.key])),
+    y: rows.map((r) => r[c.key]),
+    features: feats,
+    names: feats.map((f) => (f.unit ? `${f.label} (${f.unit})` : f.label)),
   };
 }
 

@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classification | EDPY 506</title>
+<meta name="description" content="Supervised machine learning for classification: logistic regression, k-nearest neighbours, support vector machines, the confusion matrix, precision and recall, and ROC/AUC.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">EDPY 506</a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Topics"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Topic 3</p>
+      <h1>Classification</h1>
+      <p class="lede">
+        Predicting a category rather than a number. The same homes, and a different
+        question: will it sell inside thirty days?
+      </p>
+      <nav class="toc" aria-label="Sections">
+        <a href="#what">What makes it classification</a>
+        <a href="#noline">Why not a straight line</a>
+        <a href="#logistic">Logistic regression</a>
+        <a href="#knn">k-nearest neighbours</a>
+        <a href="#choosek">Choosing k</a>
+        <a href="#svm">Support vector machines</a>
+        <a href="#confusion">The confusion matrix</a>
+        <a href="#metrics">Accuracy, precision, recall, F1</a>
+        <a href="#threshold">The threshold</a>
+        <a href="#roc">ROC and AUC</a>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ==================== 1. WHAT MAKES IT CLASSIFICATION ==================== -->
+  <section class="chapter" id="what">
+    <div class="prose">
+      <h2><span class="steplabel">1</span>What makes it classification</h2>
+      <p>
+        Classification is a predictive modelling problem where a <strong>class label</strong>
+        is predicted from a set of features. The split from
+        <a href="regression.html">regression</a> is the kind of target: regression predicts a
+        number, classification predicts a category. Everything else about the setup is the
+        same.
+      </p>
+      <p>
+        Predicting whether a home sells inside thirty days is classification, on the same
+        rows and the same columns that gave a regression problem when the target was the
+        price. Other examples from the same mould: using indicators in a health database to
+        predict whether someone is likely to suffer a heart attack, sorting customer
+        comments into negative, neutral and positive, and predicting whether a bank customer
+        will default on a loan.
+      </p>
+      <p>
+        There are three shapes the target can take:
+      </p>
+      <div class="split split--even" style="margin-top:1rem">
+        <div class="card">
+          <h3>Binary</h3>
+          <p class="small" style="margin-top:0.35rem">
+            Two possible outcomes. Email spam detection, spam or not. Sold in thirty days,
+            or not.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Multi-class</h3>
+          <p class="small" style="margin-top:0.35rem">
+            More than two outcomes, one per case. Sentiment analysis. Fitted either
+            <strong>one-vs-rest</strong>, one binary model per class against all the others,
+            or <strong>one-vs-one</strong>, one binary model per pair of classes.
+          </p>
+        </div>
+      </div>
+      <div class="card" style="margin-top:0.9rem">
+        <h3>Multi-label</h3>
+        <p class="small" style="margin-top:0.35rem">
+          Two or more outcomes, and a case may carry more than one at once. Classifying film
+          genres, where a film can belong to several.
+        </p>
+      </div>
+      <p style="margin-top:1.4rem">
+        Classification algorithms predict the <strong>probability</strong> of one class over
+        the others, and usually the probability of one particular category is what matters.
+        An estimate of the chance that an email is spam is more useful than an estimate of
+        the chance it is not.
+      </p>
+      <p>
+        The algorithms: logistic regression, decision trees, random forest, support vector
+        machines, and k-nearest neighbours. Trees and forests have
+        <a href="trees.html">their own page</a> and work for both kinds of target without
+        modification. The other three are below.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 2. WHY NOT A STRAIGHT LINE ==================== -->
+  <section class="chapter" id="noline">
+    <div class="prose">
+      <h2><span class="steplabel">2</span>Why a straight line will not do</h2>
+      <p>
+        The target takes two values. Writing selling inside thirty days as 1 and not selling
+        as 0 makes it numeric, and nothing stops least squares from fitting a line to it.
+      </p>
+      <div class="formula">
+        <em>Y</em> =
+        <span style="display:inline-block; vertical-align:middle; border-left:2px solid currentColor; padding-left:0.5em; text-align:left; line-height:1.5">
+          0 &nbsp;→&nbsp; if it did not sell in thirty days<br>
+          1 &nbsp;→&nbsp; if it did
+        </span>
+      </div>
+      <p>
+        The feature is how the asking price compares with the going rate for homes like it.
+        A home priced under the local rate should sell quickly, one priced over it should
+        sit. <strong>Move the marker along the price axis</strong> and read what each model
+        says the probability is.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">A line and a curve, on a target that is only ever 0 or 1</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Asking price, against the local rate</span>
+          <input type="range" id="probe" min="-40" max="40" step="0.5" value="-30">
+          <output id="probe-out"></output>
+        </label>
+        <div class="segmented" id="noline-mode">
+          <button type="button" data-m="line" aria-pressed="true">Straight line</button>
+          <button type="button" data-m="both" aria-pressed="false">Both</button>
+        </div>
+      </div>
+      <div class="split split--wide-left">
+        <div id="noline-chart"></div>
+        <div>
+          <div class="stats stats--1" id="noline-stats"></div>
+          <div id="noline-verdict" class="callout" style="margin-top:0.8rem"></div>
+        </div>
+      </div>
+      <div class="legend" id="noline-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="noline-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <strong>A probability cannot be 1.4, and it cannot be −0.2.</strong> The line has no
+        way to know that. It extends forever in both directions because that is what lines
+        do, and the further a home sits from the middle of the data the more confidently
+        nonsensical its answer becomes. What is needed is a curve that bends toward 0 and 1
+        and never crosses either.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 3. LOGISTIC REGRESSION ==================== -->
+  <section class="chapter" id="logistic">
+    <div class="prose">
+      <h2><span class="steplabel">3</span>Logistic regression</h2>
+      <p>
+        Logistic regression models the <strong>probability</strong> of a binary outcome:
+      </p>
+      <div class="formula">
+        <em>P</em>(<em>Y</em> = 1 | <em>X</em>) =
+        <span class="frac">
+          <span><em>e</em><sup><em>β</em><sub>0</sub> + <em>β</em><sub>1</sub><em>X</em></sup></span>
+          <span>1 + <em>e</em><sup><em>β</em><sub>0</sub> + <em>β</em><sub>1</sub><em>X</em></sup></span>
+        </span>
+        <span class="lbl">where <em>e</em> ≈ 2.71828, Euler's number</span>
+      </div>
+      <p>
+        It is still a regression equation, and it still has an intercept and a slope. The
+        difference is the shape it is wrapped in, which yields values between 0 and 1
+        whatever <em>β</em><sub>0</sub>, <em>β</em><sub>1</sub> and <em>X</em> happen to be.
+      </p>
+      <p>
+        The same relationship is easier to handle written in terms of the
+        <strong>log odds</strong>, or logit:
+      </p>
+      <div class="formula">
+        log <span class="frac">
+          <span><em>P</em>(<em>Y</em>)</span>
+          <span>1 − <em>P</em>(<em>Y</em>)</span>
+        </span>
+        = <em>β</em><sub>0</sub> + <em>β</em><sub>1</sub><em>X</em>
+        <span class="lbl">a straight line again, on a scale where a straight line is allowed</span>
+      </div>
+      <p>
+        <strong>Drag the two coefficients.</strong> The intercept slides the curve sideways
+        and the slope decides how sharply it turns.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The two numbers in a logistic regression</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Intercept <em>β</em><sub>0</sub></span>
+          <input type="range" id="beta0" min="-4" max="4" step="0.05" value="-2.5">
+          <output id="beta0-out"></output>
+        </label>
+        <label class="field"><span class="field__name">Slope <em>β</em><sub>1</sub></span>
+          <input type="range" id="beta1" min="-0.6" max="0.6" step="0.005" value="0.05">
+          <output id="beta1-out"></output>
+        </label>
+        <button class="btn btn--primary" id="logit-fit">Fit it for me</button>
+      </div>
+      <div class="split split--even">
+        <div id="logit-chart"></div>
+        <div id="logit-odds"></div>
+      </div>
+      <div class="stats stats--3" id="logit-stats" style="margin-top:1rem"></div>
+      <div class="figure__note" id="logit-note"></div>
+    </div>
+
+    <div class="prose">
+      <h3>More than two categories</h3>
+      <p>
+        With <em>K</em> categories in the target rather than two, the same function is fitted
+        for each:
+      </p>
+      <div class="formula">
+        <em>P</em>(<em>Y</em> = <em>k</em> | <em>X</em>) =
+        <span class="frac">
+          <span><em>e</em><sup><em>β</em><sub>0</sub> + <em>β</em><sub>1</sub><em>X</em></sup></span>
+          <span>1 + <em>e</em><sup><em>β</em><sub>0</sub> + <em>β</em><sub>1</sub><em>X</em></sup></span>
+        </span>
+      </div>
+      <p>
+        <em>K</em> − 1 logistic functions are needed to predict <em>K</em> outcomes, because
+        the last category's probability is whatever is left over. That is
+        <strong>multinomial</strong> logistic regression.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 4. KNN ==================== -->
+  <section class="chapter" id="knn">
+    <div class="prose">
+      <h2><span class="steplabel">4</span>k-nearest neighbours</h2>
+      <p>
+        One of the simplest classifiers, and among the most used. KNN is a <strong>lazy
+        learner</strong>: it does not train a model at all. An observation is assigned to
+        whichever class holds the largest number of its k nearest neighbours. Surrounded by
+        class 1, it is classified as class 1.
+      </p>
+      <p>
+        Everything happens at prediction time. Given a case with an unknown class, the
+        algorithm finds the k closest cases by some distance measure, those k
+        <strong>vote</strong> by their own class, and the winner is the prediction.
+      </p>
+      <h3>What counts as close</h3>
+      <p>
+        Distance stands in for similarity: the two closest observations are the two most
+        alike. For observations <em>x</em> and <em>y</em>:
+      </p>
+      <div class="formula formula--left">
+        <span class="row"><b>Euclidean</b> &nbsp;<em>d</em> =
+          <span class="radical radical--tall"><span class="radical__sign">√</span><span class="radical__body"><span class="sum">Σ</span><sub><em>i</em>=1</sub><sup><em>n</em></sup> (<em>x</em><sub><em>i</em></sub> − <em>y</em><sub><em>i</em></sub>)²</span></span>
+        </span>
+        <span class="row"><b>Manhattan</b> &nbsp;<em>d</em> =
+          <span class="sum">Σ</span><sub><em>i</em>=1</sub><sup><em>n</em></sup>
+          |<em>x</em><sub><em>i</em></sub> − <em>y</em><sub><em>i</em></sub>|
+        </span>
+        <span class="row"><b>Minkowski</b> &nbsp;<em>d</em> =
+          ( <span class="sum">Σ</span><sub><em>i</em>=1</sub><sup><em>n</em></sup>
+          |<em>x</em><sub><em>i</em></sub> − <em>y</em><sub><em>i</em></sub>|<sup><em>p</em></sup> )<sup>1/<em>p</em></sup>
+          <span class="muted">&nbsp;— <em>p</em> = 1 is Manhattan, <em>p</em> = 2 is Euclidean, and 2 is Python's default</span>
+        </span>
+      </div>
+      <div class="callout callout--warn">
+        <strong>Distance treats every feature as if it were on the same scale.</strong>
+        Standardising the features before using a KNN classifier is therefore not optional.
+        Leave it out and whichever column happens to be measured in the largest units
+        decides every vote on its own.
+      </div>
+      <p>
+        <strong>Drag the query home around the plane.</strong> Its k nearest neighbours are
+        joined to it, and they are listed with their distances underneath the vote.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One home, its neighbours, and their vote</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Neighbours (k)</span>
+          <input type="range" id="knn-k" min="1" max="45" step="2" value="1">
+          <output id="knn-k-out"></output>
+        </label>
+        <div class="segmented" id="knn-metric">
+          <button type="button" data-p="2" aria-pressed="true">Euclidean</button>
+          <button type="button" data-p="1" aria-pressed="false">Manhattan</button>
+        </div>
+        <div class="segmented" id="knn-scale">
+          <button type="button" data-s="1" aria-pressed="true">Standardised</button>
+          <button type="button" data-s="0" aria-pressed="false">Raw units</button>
+        </div>
+        <label class="field">
+          <input type="checkbox" id="knn-boundary" checked> Shade the decision boundary
+        </label>
+      </div>
+      <div class="split split--wide-left">
+        <div id="knn-chart"></div>
+        <div>
+          <div class="stats stats--1" id="knn-vote"></div>
+          <div id="knn-list" style="margin-top:0.8rem"></div>
+        </div>
+      </div>
+      <div class="legend" id="knn-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="knn-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 5. CHOOSING K ==================== -->
+  <section class="chapter" id="choosek">
+    <div class="prose">
+      <h2><span class="steplabel">5</span>Choosing k</h2>
+      <p>
+        At k = 1 the prediction on the training set is perfect, because every training case
+        is its own nearest neighbour. As more neighbours are considered the model gets
+        simpler and training accuracy drops. Test accuracy behaves differently: it is low at
+        a single neighbour, improves, and then gets worse again. The best performance is
+        somewhere in the middle.
+      </p>
+      <p>
+        At the other extreme, with k set to the number of training cases, every prediction
+        is the majority class and the features are ignored entirely.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Accuracy against the number of neighbours</div>
+      <div class="figure__sub" id="choosek-sub"></div>
+      <div id="choosek-chart"></div>
+      <div class="legend" id="choosek-legend" style="margin-top:0.6rem"></div>
+      <div class="stats stats--3" id="choosek-stats" style="margin-top:1rem"></div>
+      <div class="figure__note" id="choosek-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <strong>The same curve as on the two previous pages, with a third knob.</strong>
+        Complexity was the degree of a polynomial, then the depth of a tree, and here it is
+        1/k: small k is a complex model that follows every point including the noise, large
+        k is a simple one that averages over distant and irrelevant cases. Overfitting on
+        the left, underfitting on the right, and the useful model between them.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 6. SVM ==================== -->
+  <section class="chapter" id="svm">
+    <div class="prose">
+      <h2><span class="steplabel">6</span>Support vector machines</h2>
+      <p>
+        A family of techniques developed in the 1980s in computer science. Support vector
+        machines work for regression or classification and are mostly applied to
+        classification. The goal is to take groups of observations and construct boundaries
+        that predict which group a future observation belongs to.
+      </p>
+      <p>Three terms carry the idea:</p>
+      <ul>
+        <li><strong>The hyperplane</strong> is the decision boundary that classifies the
+          data points. In two dimensions it is a line.</li>
+        <li><strong>The margin</strong> is the gap between the hyperplane and the closest
+          points on either side.</li>
+        <li><strong>The support vectors</strong> are the points on or nearest to the
+          hyperplane, which influence its position. Move any other observation and the
+          hyperplane does not move at all, unless the move carries it across the boundary of
+          the margin.</li>
+      </ul>
+      <p>
+        When classes are perfectly separable an infinite number of hyperplanes will separate
+        them. The one to take is the one with the <strong>largest margin</strong>, which is
+        the <strong>maximal margin classifier</strong>. The hope is that a classifier with a
+        large margin on the training data also has a large margin on the test data, and so
+        classifies well.
+      </p>
+      <p>
+        Two cases are distinguished by whether such a line exists at all. <strong>Linear
+        SVM</strong> is when the points can be separated with a straight line. <strong>Non-linear
+        SVM</strong> is when they cannot, and a non-linear boundary is needed.
+      </p>
+      <p>
+        <strong>Widen the margin and watch which points hold it up.</strong> The circled
+        homes are the support vectors.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The hyperplane, the margin, and the points that set them</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">How much a violation costs (<em>C</em>)</span>
+          <input type="range" id="svm-c" min="0" max="40" step="1" value="20">
+          <output id="svm-c-out"></output>
+        </label>
+        <div class="segmented" id="svm-data">
+          <button type="button" data-d="separable" aria-pressed="true">Separable homes</button>
+          <button type="button" data-d="real" aria-pressed="false">All the homes</button>
+        </div>
+      </div>
+      <div class="split split--wide-left">
+        <div id="svm-chart"></div>
+        <div>
+          <div class="stats stats--1" id="svm-stats"></div>
+          <div id="svm-explain" class="callout" style="margin-top:0.8rem"></div>
+        </div>
+      </div>
+      <div class="legend" id="svm-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="svm-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 7. CONFUSION MATRIX ==================== -->
+  <section class="chapter" id="confusion">
+    <div class="prose">
+      <h2><span class="steplabel">7</span>The confusion matrix</h2>
+      <p>
+        Many evaluation metrics exist for testing a classifier, and several are usually used
+        together to decide whether a model performs well enough. Nearly all of them rest on
+        correctly identifying the classes, which is what a <strong>confusion matrix</strong>
+        tabulates: the number of correct and incorrect predictions, in four cells.
+      </p>
+      <ul>
+        <li><strong>True positives (TP)</strong> — the actual value is positive and the
+          prediction is positive too.</li>
+        <li><strong>True negatives (TN)</strong> — the actual value is negative and the
+          prediction is negative.</li>
+        <li><strong>False positives (FP)</strong> — the actual value is negative, but the
+          prediction is positive. A <strong>Type I error</strong>.</li>
+        <li><strong>False negatives (FN)</strong> — the actual value is positive, but the
+          prediction is negative. A <strong>Type II error</strong>.</li>
+      </ul>
+      <p>
+        A good model has high TP and TN and low FP and FN.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The four outcomes, on <span id="cm-n"></span> homes the model has never seen</div>
+      <div class="figure__sub" id="cm-sub"></div>
+      <div class="split split--even">
+        <div id="cm-grid"></div>
+        <div>
+          <div id="cm-words"></div>
+        </div>
+      </div>
+      <div class="figure__note" id="cm-note"></div>
+    </div>
+
+    <div class="prose">
+      <details class="aside">
+        <summary>The worked example from the lecture, checked</summary>
+        <div id="cm-worked"></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ==================== 8. METRICS ==================== -->
+  <section class="chapter" id="metrics">
+    <div class="prose">
+      <h2><span class="steplabel">8</span>Accuracy, precision, recall, F1</h2>
+      <p>
+        <strong>Accuracy</strong> is the proportion of observations predicted correctly, and
+        its appeal is that the explanation is plain:
+      </p>
+      <div class="formula">
+        Accuracy =
+        <span class="frac"><span>TP + TN</span><span>TP + TN + FP + FN</span></span>
+        <span class="lbl">correct predictions over all predictions</span>
+      </div>
+      <p>
+        In the real world classes are often imbalanced, say 95% of observations in one class
+        and 5% in the other. Accuracy then suffers from a paradox: a model can be highly
+        accurate while having no predictive power at all, by predicting the common class
+        every time.
+      </p>
+      <p>
+        <strong>Move the class balance</strong> and watch a model that never predicts the
+        positive class at all.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width:52rem">
+      <div class="figure__title">The accuracy paradox</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Share of homes that sold quickly</span>
+          <input type="range" id="balance" min="1" max="50" step="1" value="50">
+          <output id="balance-out"></output>
+        </label>
+      </div>
+      <div class="stats stats--3" id="balance-stats"></div>
+      <div class="figure__note" id="balance-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        Because of that, precision, recall and F1 are usually calculated alongside it.
+      </p>
+      <div class="formula formula--left">
+        <span class="row"><b>Precision</b> =
+          <span class="frac"><span>TP</span><span>TP + FP</span></span>
+          <span class="muted">&nbsp;— correct positives over all predicted positives</span></span>
+        <span class="row"><b>Recall</b> =
+          <span class="frac"><span>TP</span><span>TP + FN</span></span>
+          <span class="muted">&nbsp;— correct positives over all actual positives</span></span>
+        <span class="row"><b>F1</b> = 2 ×
+          <span class="frac"><span>Precision × Recall</span><span>Precision + Recall</span></span>
+          <span class="muted">&nbsp;— the harmonic mean of the two</span></span>
+      </div>
+      <p>
+        <strong>Precision</strong>, also called positive predictive value, is the proportion
+        of everything predicted positive that really is positive. It is the measure to use
+        when the goal is to limit false positives. A model predicting whether a new drug will
+        work in a clinical trial is the example: trials are very expensive, so the model must
+        not produce many false positives.
+      </p>
+      <p>
+        <strong>Recall</strong>, also called sensitivity, the hit rate, or the true positive
+        rate, measures how many of the actual positives the model caught. It is the measure
+        to use when every positive must be found and false negatives are what must be
+        avoided. In cancer diagnosis it is important to find all the people who are sick,
+        even at the cost of including some healthy patients.
+      </p>
+      <div class="callout">
+        <strong>The two trade against each other.</strong> Perfect recall is trivial: predict
+        the positive class for everything, and no positive is ever missed. There are then no
+        false negatives and a great many false positives, so precision collapses. Design for
+        high precision instead and the diagnoses you do make are confident ones, at the cost
+        of failing to identify everyone with the disease, which for those left undiagnosed is
+        potentially fatal. Almost always what is wanted is a balance, and
+        <strong>F1</strong> is the single number that takes both into account.
+      </div>
+      <p class="small muted">
+        Accuracy, precision, recall and F1 all range from 0 to 1, and higher is better in
+        every case.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 9. THRESHOLD ==================== -->
+  <section class="chapter" id="threshold">
+    <div class="prose">
+      <h2><span class="steplabel">9</span>The threshold is a choice</h2>
+      <p>
+        What a classification model returns is a probability. Turning that into a category
+        requires a <strong>classification threshold</strong>, also called the decision
+        threshold. The default assumption is 0.5, but thresholds are problem-dependent and
+        are a value to tune. Changing it changes the model's measured performance without
+        changing the model at all.
+      </p>
+      <p>
+        <strong>Move the threshold</strong> and watch the four cells and the four metrics
+        move with it.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One model, every threshold</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Classification threshold</span>
+          <input type="range" id="thr" min="2" max="98" step="1" value="50">
+          <output id="thr-out"></output>
+        </label>
+        <button class="btn" id="thr-half">Back to 0.5</button>
+        <button class="btn" id="thr-recall">Best recall the model can give</button>
+        <button class="btn" id="thr-f1">Best F1</button>
+      </div>
+      <div id="thr-strip"></div>
+      <div class="split split--even" style="margin-top:1.2rem">
+        <div id="thr-cm"></div>
+        <div>
+          <div class="stats stats--2" id="thr-metrics"></div>
+          <div id="thr-verdict" class="callout" style="margin-top:0.8rem"></div>
+        </div>
+      </div>
+      <div class="figure__note" id="thr-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 10. ROC AND AUC ==================== -->
+  <section class="chapter" id="roc">
+    <div class="prose">
+      <h2><span class="steplabel">10</span>ROC and AUC</h2>
+      <p>
+        The <strong>receiver operating characteristic</strong> curve evaluates a model across
+        every threshold at once. It compares true positives against false positives at each
+        one: the horizontal axis is the false positive rate, the vertical axis is the true
+        positive rate, and each point on the curve is one threshold.
+      </p>
+      <p>
+        Reading it: a classifier that predicts at random traces the diagonal, and a perfect
+        one goes straight up the left edge and along the top. Curves above the diagonal are
+        decent, and the higher up they sit the better. Anything below the diagonal performs
+        worse than guessing.
+      </p>
+      <p>
+        ROC curves are particularly useful for comparing several classifiers built from
+        different algorithms or different settings.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Every threshold at once</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Threshold</span>
+          <input type="range" id="roc-thr" min="2" max="98" step="1" value="50">
+          <output id="roc-thr-out"></output>
+        </label>
+        <label class="field">
+          <input type="checkbox" id="roc-compare"> Compare against a weaker model
+        </label>
+      </div>
+      <div class="split split--even">
+        <div id="roc-chart"></div>
+        <div>
+          <div class="stats stats--1" id="roc-stats"></div>
+          <div class="figure__note" id="roc-read" style="margin-top:0.6rem"></div>
+        </div>
+      </div>
+      <div class="figure__note" id="roc-note"></div>
+    </div>
+
+    <div class="prose">
+      <h3>The area under it</h3>
+      <p>
+        <strong>AUC</strong> measures the entire two-dimensional area underneath the ROC
+        curve, giving an aggregate measure of performance across all possible thresholds. It
+        runs from 0 to 1 and higher is better. A perfect classifier scores 1 and a random one
+        scores 0.5, so anything under 0.5 indicates very poor performance.
+      </p>
+      <div class="callout callout--warn">
+        <strong>AUC treats every classification error equally</strong>, ignoring the
+        consequences of one kind over another. On a cancer screen a missed case and a false
+        alarm are not equivalent, and a single number that scores them the same cannot say
+        which model to prefer. That judgement comes from the problem, not from the metric.
+      </div>
+      <p>
+        Which is where classification arrives at the same place as
+        <a href="regression.html#lambda">regression</a> and
+        <a href="trees.html#prune">trees</a>. A model has knobs, the knobs trade one kind of
+        error against another, and no measure chooses for you which kind you can least afford.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    EDPY 506, University of Alberta · Content follows the lectures of
+    Dr. Okan Bulut · <a href="index.html">Back to the index</a>
+  </div>
+</footer>
+
+<script type="module" src="assets/classification-page.js"></script>
+</body>
+</html>

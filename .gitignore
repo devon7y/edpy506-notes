@@ -6,6 +6,9 @@
 # they are what the site is built to explain, not part of what it publishes.
 *.pdf
 *Demo*.html
+# reference material saved into the working directory while writing a page
+*reference*.html
+*artifact*.html
 
 # --- macOS ---
 .DS_Store

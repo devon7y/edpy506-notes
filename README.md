@@ -13,6 +13,7 @@ when you do.
 |---|---|
 | [Regression](regression.html) | Least squares, R² and RMSE, multiple regression, bias and variance, under- and overfitting, ridge, lasso, choosing λ by cross-validation |
 | [Decision trees and random forests](trees.html) | Where a split comes from, growing and overgrowing a tree, cost-complexity pruning, hyperparameters, random forests, permutation importance |
+| [Classification](classification.html) | Why a line cannot predict a probability, logistic regression, k-nearest neighbours, support vector machines, the confusion matrix, precision and recall, the threshold, ROC and AUC |
 
 ## Running it locally
 
@@ -41,6 +42,10 @@ pip install playwright && playwright install chromium
 ```
 
 ## About the data
+
+The same homes carry two questions: what a home is worth, which is a regression
+problem, and whether it sells inside thirty days, which is a classification
+problem on identical features.
 
 The homes are **simulated**, not real Edmonton sales. They are generated from a
 seeded random number generator in `assets/datasets.js`, so the site draws the

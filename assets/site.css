@@ -715,6 +715,41 @@ details.aside > *:not(summary) { margin-top: 0.7rem; }
 .bars__val { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
 @media (max-width: 560px) { .bars__row { grid-template-columns: 6.5rem 1fr 4.5rem; } }
 
+/* ---------- confusion matrix ---------- */
+/* Rows are the actual class and columns the predicted one, which is the
+   arrangement every metric formula assumes. */
+.cm {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 0.5rem;
+  align-items: center;
+}
+.cm__axis {
+  font-size: 0.72rem;
+  font-weight: 660;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+}
+.cm__axis--side { writing-mode: vertical-rl; transform: rotate(180deg); }
+.cm__cell {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--critical);
+  background: var(--surface-1);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.8rem;
+}
+.cm__cell--right { border-left-color: var(--good); }
+.cm__cell--on { border-color: var(--accent); background: var(--accent-wash); }
+.cm__n { font-size: 1.5rem; font-weight: 660; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.cm__label { font-size: 0.78rem; font-weight: 640; margin-top: 0.15rem; }
+.cm__sub { font-size: 0.72rem; color: var(--text-muted); line-height: 1.35; margin-top: 0.1rem; }
+@media (max-width: 560px) {
+  .cm { grid-template-columns: 1fr 1fr; }
+  .cm__axis--side { display: none; }
+}
+
 /* ---------- in-page section index ---------- */
 .toc { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1.2rem; }
 .toc a {
