@@ -1,5 +1,7 @@
 # EDPY 506 — interactive course notes
 
+**Live at <https://devon7y.github.io/edpy506-notes/>**
+
 Study notes for **EDPY 506 Machine Learning: Theory and Applications**
 (University of Alberta), rebuilt as pages you can interact with. Every model
 the course covers gets a page, a figure whose parameter you can drag, and an
@@ -12,7 +14,7 @@ account of what happens when you do.
 | [Regression](regression.html) | Least squares, R² and RMSE, multiple regression, bias and variance, under- and overfitting, ridge, lasso, choosing λ by cross-validation |
 | [Decision trees and random forests](trees.html) | Where a split comes from, growing and overgrowing a tree, cost-complexity pruning, hyperparameters, random forests, permutation importance |
 
-## Running it
+## Running it locally
 
 No build step and no dependencies. It has to be *served* rather than opened as
 a `file://` path, because the pages are ES modules.
@@ -21,6 +23,9 @@ a `file://` path, because the pages are ES modules.
 python3 -m http.server 8000
 # then open http://localhost:8000
 ```
+
+Pushing to `main` republishes the site. GitHub Pages serves this repository
+directly, so run `npm run check` before pushing.
 
 ## Checks
 

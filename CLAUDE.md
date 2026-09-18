@@ -89,6 +89,17 @@ tools/check_pages.py  browser check: errors, empty figures, overflow, id clashes
 The maths modules (`linreg.js`, `trees.js`) import nothing but `site.js` and
 use plain arrays, which is what lets `node --test` run them directly.
 
+## Publishing
+
+The site is served straight from `main` by GitHub Pages at
+<https://devon7y.github.io/edpy506-notes/>. There is no build and no deploy
+step: pushing to `main` republishes it a minute or so later. Run the checks
+below before pushing, because a broken push is a broken public page.
+
+The repository is public, which is what makes Pages free on this account. That
+is the reason the slides, the syllabus and the instructor's demos are
+gitignored rather than merely untracked.
+
 ## Checks
 
 ```bash
