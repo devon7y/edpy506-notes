@@ -8,7 +8,7 @@
    organised by topic, not by lecture: a lecture that covers two topics gets
    two pages, and a topic revisited in a later lecture grows its existing page. */
 export const CHAPTERS = [
-  { href: 'index.html', short: 'Start', title: 'EDPY 506 notes' },
+  { href: 'index.html', short: 'Start', title: 'EDPY 506' },
   { href: 'regression.html', short: 'Regression', title: 'Regression' },
   { href: 'trees.html', short: 'Trees & forests', title: 'Decision trees and random forests' },
 ];
