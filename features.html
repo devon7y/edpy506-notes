@@ -141,6 +141,31 @@
       <div id="sh-chart"></div>
       <div class="figure__note" id="sh-note"></div>
     </div>
+
+    <div class="prose">
+      <p>
+        A <strong>square root transformation</strong> or a <strong>log transformation</strong>
+        changes more than the units. Both compress the higher values, so the lower values end up
+        more spread out, and the log compresses high values more aggressively than the square
+        root. The square root needs values of zero or more, and the log needs values above zero.
+        <strong>Slide the starting value down through zero</strong> and each one runs out of
+        values it can take.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Evenly spaced values, after a square root and after a log</div>
+      <div class="figure__sub" id="tr-sub"></div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Raw values start at</span>
+          <input type="range" id="tr-min" min="-3" max="20" step="1" value="1">
+          <output id="tr-min-out"></output>
+        </label>
+      </div>
+      <div id="tr-chart"></div>
+      <div class="stats stats--3" id="tr-stats" style="margin-top:1rem"></div>
+      <div class="figure__note" id="tr-note"></div>
+    </div>
   </section>
 
   <!-- ==================== 4. CATEGORICAL ==================== -->

@@ -5,7 +5,7 @@
 
 import {
   initChrome, svgRoot, frame, scale, linePath, el, responsive, token, tooltip,
-  mean, money, money1k, rng, gauss, clipRect, tweenInput,
+  mean, money, money1k, rng, gauss, clipRect, tweenInput, ticks,
 } from './site.js';
 import { randomForest, forestImportance } from './trees.js';
 import { zscore, minmax, correlations, correlationFilter, rfe } from './features.js';
@@ -134,6 +134,170 @@ const k$ = money1k;
       }
     });
   });
+}
+
+/* ===================================================================
+   3. Square root and log, applied to evenly spaced values
+   =================================================================== */
+{
+  const host = document.getElementById('tr-chart');
+  const minEl = document.getElementById('tr-min');
+  const COUNT = 18;
+  const ROWS = [
+    { label: 'Raw data', formula: 'x', f: (x) => x, ok: () => true, color: '--series-6' },
+    { label: 'Square root', formula: '√x', f: Math.sqrt, ok: (x) => x >= 0, color: '--series-1' },
+    { label: 'Log', formula: 'log x', f: Math.log, ok: (x) => x > 0, color: '--series-7' },
+  ];
+  const values = () => Array.from({ length: COUNT }, (_, i) => +minEl.value + i);
+  const num = (v, d = 2) => `${v < 0 ? '−' : ''}${Math.abs(v).toFixed(d)}`;
+  const pct = (v) => `${Math.round(100 * v)}%`;
+
+  /* The gaps between the two smallest and the two largest values. Their ratio
+     is unit-free, so it compares rows on different scales. It is taken over
+     the values every row can transform, so all three compare the same range. */
+  const common = (xs) => xs.filter((x) => ROWS.every((row) => row.ok(x)));
+  const gaps = (row, xs) => {
+    const v = common(xs).map(row.f);
+    const first = v[1] - v[0], last = v[v.length - 1] - v[v.length - 2];
+    return { first, last, ratio: last / first };
+  };
+
+  const draw = () => {
+    const xs = values();
+    /* On a phone the chart is drawn at the phone's width, with the row names
+       above the rows rather than beside them, so its text stays legible. */
+    const w = Math.round(Math.max(320, Math.min(900, host.clientWidth || 900)));
+    const narrow = w < 600;
+    const L = narrow ? 18 : 150, R = narrow ? 14 : 26;
+    const rowY = narrow ? [48, 168, 288] : [34, 154, 274];
+    const h = rowY[2] + 42;
+    const svg = svgRoot(host, w, h);
+    const sx = scale(xs[0], xs[COUNT - 1], L, w - R);
+
+    /* Each transformed row is stretched so its smallest and largest values
+       sit under the same two values in the raw row. The spacing in between
+       is then the transformation's own. */
+    const pos = ROWS.map((row) => {
+      const valid = xs.filter(row.ok);
+      const a = valid[0], b = valid[valid.length - 1];
+      const map = scale(row.f(a), row.f(b), sx(a), sx(b));
+      return { map, lo: row.f(a), hi: row.f(b), x: xs.map((x) => (row.ok(x) ? map(row.f(x)) : null)) };
+    });
+
+    const DOT = narrow ? 4.5 : 6;
+    const marks = xs.map(() => ({ dots: [], links: [] }));
+    const linkG = el('g', {}, svg);
+    for (let r = 0; r + 1 < ROWS.length; r++) {
+      xs.forEach((_, i) => {
+        const x1 = pos[r].x[i], x2 = pos[r + 1].x[i];
+        if (x1 == null || x2 == null) return;
+        marks[i].links.push(el('line', { x1, y1: rowY[r] + 9, x2, y2: rowY[r + 1] - 9,
+          stroke: token('--baseline'), 'stroke-width': 1.2 }, linkG));
+      });
+    }
+
+    ROWS.forEach((row, r) => {
+      const y = rowY[r], P = pos[r];
+      el('line', { x1: L - 6, x2: w - R + 6, y1: y, y2: y, stroke: token('--grid'), 'stroke-width': 1 }, svg);
+      if (narrow) {
+        el('text', { x: 4, y: y - 20, 'font-size': 13, 'font-weight': 680, fill: token(row.color),
+          stroke: token('--surface-1'), 'stroke-width': 5, 'paint-order': 'stroke' }, svg)
+          .textContent = `${row.label}, ${row.formula}`;
+      } else {
+        el('text', { x: 12, y: y - 2, 'font-size': 14, 'font-weight': 680, fill: token(row.color) }, svg).textContent = row.label;
+        el('text', { class: 'tick', x: 12, y: y + 15 }, svg).textContent = row.formula;
+      }
+
+      const tv = r === 0 ? ticks(xs[0], xs[COUNT - 1], narrow ? 4 : 8) : ticks(P.lo, P.hi, narrow ? 3 : 5);
+      for (const t of tv) {
+        const tx = r === 0 ? sx(t) : P.map(t);
+        el('line', { x1: tx, x2: tx, y1: y + 10, y2: y + 15, stroke: token('--text-muted') }, svg);
+        el('text', { class: 'tick', x: tx, y: y + 28, 'text-anchor': 'middle',
+          stroke: token('--surface-1'), 'stroke-width': 5, 'paint-order': 'stroke' }, svg)
+          .textContent = Number.isInteger(t) ? num(t, 0) : num(t, 1);
+      }
+
+      const bad = xs.filter((x) => !row.ok(x));
+      if (bad.length) {
+        for (const x of bad) {
+          const cx = sx(x), d = 4.5;
+          el('path', { d: `M${cx - d} ${y - d}L${cx + d} ${y + d}M${cx - d} ${y + d}L${cx + d} ${y - d}`,
+            stroke: token('--text-muted'), 'stroke-width': 1.6 }, svg);
+        }
+        el('text', { class: 'annot', x: narrow ? w - 4 : sx(bad[0]) - 6, y: narrow ? y - 20 : y - 14,
+          'text-anchor': narrow ? 'end' : 'start',
+          stroke: token('--surface-1'), 'stroke-width': 5, 'paint-order': 'stroke' }, svg)
+          .textContent = `not defined for ${bad.length === 1 ? num(bad[0], 0) : `${num(bad[0], 0)} to ${num(bad[bad.length - 1], 0)}`}`;
+      }
+
+      xs.forEach((x, i) => {
+        if (P.x[i] == null) return;
+        marks[i].dots.push(el('circle', { cx: P.x[i], cy: y, r: DOT, fill: token(row.color),
+          stroke: token('--surface-1'), 'stroke-width': 1.5 }, svg));
+      });
+    });
+
+    /* one hit target per value in each row, so a value can be traced through
+       all three rows from wherever the pointer finds it */
+    const light = (i, on) => {
+      marks[i].dots.forEach((d) => { d.setAttribute('r', on ? DOT + 2.5 : DOT);
+        d.setAttribute('stroke', token(on ? '--text-primary' : '--surface-1')); });
+      marks[i].links.forEach((l) => { l.setAttribute('stroke', token(on ? '--text-primary' : '--baseline'));
+        l.setAttribute('stroke-width', on ? 2.2 : 1.2); });
+    };
+    xs.forEach((x, i) => ROWS.forEach((row, r) => {
+      if (pos[r].x[i] == null) return;
+      const hit = el('circle', { cx: pos[r].x[i], cy: rowY[r], r: narrow ? 9 : 13, fill: 'transparent' }, svg);
+      hit.addEventListener('pointerenter', (ev) => {
+        light(i, true);
+        tip.show(ROWS.map((q) => `${q.formula} = ${q.ok(x) ? `<b>${num(q.f(x), q === ROWS[0] ? 0 : 2)}</b>` : 'not defined'}`)
+          .join('<br>'), ev.clientX, ev.clientY);
+      });
+      hit.addEventListener('pointerleave', () => { light(i, false); tip.hide(); });
+    }));
+  };
+
+  const update = () => {
+    const xs = values(), a = xs[0], b = xs[COUNT - 1];
+    document.getElementById('tr-min-out').textContent = `${num(a, 0)} to ${num(b, 0)}`;
+    const c = common(xs), whole = c[0] === a;
+    const range = `${num(c[0], 0)} to ${num(b, 0)}`;
+    document.getElementById('tr-sub').textContent =
+      `${COUNT} values from ${num(a, 0)} to ${num(b, 0)}, one apart. Each transformed row is `
+      + `stretched so its smallest and largest values sit under the same values in the raw row; `
+      + `the numbers beneath a row are its own. The log is the natural log. Each card gives the gap `
+      + `between the two largest values as a share of the gap between the two smallest`
+      + `${whole ? '' : `, over ${range}, the values both transformations can take`}.`;
+    const g = ROWS.map((row) => gaps(row, xs));
+    document.getElementById('tr-stats').innerHTML = ROWS.map((row, r) => `
+      <div class="stat"><div class="stat__value" style="font-size:1.3rem;color:var(${row.color})">${pct(g[r].ratio)}</div>
+        <div class="stat__label">${row.label}, ${row.formula}<br>
+        <span class="muted">top gap ${num(g[r].last)}, bottom gap ${num(g[r].first)}</span></div></div>`).join('');
+
+    const [, sq, lg] = g;
+    const nNeg = xs.filter((x) => x < 0).length;
+    const lost = xs.filter((x) => !ROWS[2].ok(x)).length;
+    let domain = '';
+    if (nNeg) {
+      domain = `The square root is defined for zero and above, so it has no value for the `
+        + `${nNeg === 1 ? 'negative value' : `${nNeg} negative values`}. The log is defined only `
+        + `above zero, so it loses ${lost}, zero among them. `;
+    } else if (xs.includes(0)) {
+      domain = `Zero has a square root, 0, but no log, so the log row has one value fewer. `;
+    }
+    document.getElementById('tr-note').innerHTML = domain
+      + `Every raw gap is 1. ${whole ? 'After' : `Over ${range}, after`} a square root the gap `
+      + `between the two largest values is <b>${num(sq.last)}</b>, ${pct(sq.ratio)} of the gap `
+      + `between the two smallest; after a log it is <b>${num(lg.last)}</b>, ${pct(lg.ratio)}. `
+      + (sq.ratio < 1 && lg.ratio < sq.ratio
+        ? `Both push the high values together and leave the low ones spread out, and the log `
+          + `pushes harder.`
+        : '');
+    draw();
+  };
+
+  minEl.addEventListener('input', update);
+  responsive(host, update);
 }
 
 /* ===================================================================
