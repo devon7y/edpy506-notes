@@ -87,23 +87,47 @@ index.html            landing page and the running example
 regression.html       topic 1
 trees.html            topic 2
 classification.html   topic 3
+imbalance.html        topic 4: imbalanced classes and resampling
+features.html         topic 5: feature engineering and selection
+tuning.html           topic 6: cross-validation, grid and random search
 assets/
   site.css            design tokens, layout, components — light and dark
   site.js             chrome (nav, theme, pager), SVG helpers, small stats, RNG
   datasets.js         the homes, and the encodings each model needs
   linreg.js           OLS, metrics, polyfit, ridge, lasso, cross-validation
-  trees.js            CART, pruning, random forest, permutation importance
+  trees.js            CART, pruning, random forest, permutation and MDI importance
   classify.js         logistic regression, KNN, SVM, confusion matrix, ROC/AUC
-  regression-page.js  every figure on regression.html
-  trees-page.js       every figure on trees.html
-  classification-page.js  every figure on classification.html
+  imbalance.js        undersampling, oversampling, SMOTE, the hybrid
+  features.js         scaling, correlation filter, forward selection, RFE
+  tuning.js           k-fold splits, grid and random points, a background job runner
+  *-page.js           every figure on the page of the same name
 test/                 node tests: the maths, and the pages' structure
 tools/check_pages.py  browser check: errors, empty figures, overflow, id clashes
 tools/check_prose.py  flags metadiscourse in the pages and the page scripts
 ```
 
-The maths modules (`linreg.js`, `trees.js`) import nothing but `site.js` and
-use plain arrays, which is what lets `node --test` run them directly.
+The maths modules import nothing but `site.js` (and `imbalance.js` uses
+`standardize` from `linreg.js`) and use plain arrays, which is what lets
+`node --test` run them directly.
+
+**Rarer quick sales without new homes.** `marketLabels(rows, share)` in
+`datasets.js` relabels the same homes so that only `share` of them sold
+quickly, by shifting every home's log odds and reusing the uniform draw `u`
+that decided its original label. The homes, their prices and every published
+number stay the same; only the base rate falls. The imbalance page's severe
+case is built this way.
+
+**Heavy figures compute in the background.** A search space scored by
+cross-validated forests takes seconds. `runJobs` in `tuning.js` runs a list of
+small jobs a few milliseconds at a time and yields between batches, so the
+sliders stay live while the figure fills in. Keep each job to a few tens of
+milliseconds, and write a figure's conclusion only once its jobs have finished:
+a note built from two repetitions of sixty says something the sixty may not.
+
+**Shading by opacity reads differently in the two themes.** A heat map drawn
+as one colour at varying opacity is strongest where the opacity is high, but in
+dark mode the faint cells are the dark ones. Describe it as "the stronger the
+blue", never "darker".
 
 ## Publishing
 
@@ -175,6 +199,12 @@ The site must be **served**, not opened as `file://`: the pages are ES modules.
   looks wrong the moment it is drawn next to the claim that nothing beats it.
   `test/classify.test.mjs` checks that claim by rotating and shifting the
   boundary and confirming no alternative separator has a wider margin.
+- **Scramble a seed when the first draw matters.** `rng()` in `site.js` is
+  xorshift, and from a small seed its first output is close to zero: `rng(4)()`
+  and `rng(11)()` both start near 0.0007. Anything that uses the very first draw
+  to pick an item picks index 0 for every small seed. Pass
+  `(seed * 2654435761) >>> 0` instead. The generator itself is left alone,
+  because changing it would move every number on every published page.
 - **A button that jumps a control to a computed answer animates there.** Use
   `tweenInput` or `tweenInputs` from `site.js`, never `el.value = x`. Watching
   the error fall as the line rotates into place is the demonstration; assigning

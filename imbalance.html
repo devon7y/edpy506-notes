@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Imbalanced classes | EDPY 506</title>
+<meta name="description" content="Class imbalance in classification: why a model neglects the rare class, and random undersampling, random oversampling, SMOTE and hybrid resampling as data-level fixes.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">EDPY 506</a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Topics"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Topic 4</p>
+      <h1>Imbalanced classes</h1>
+      <p class="lede">
+        When one class is rare, a model can score almost perfectly and never once find it.
+        The fixes here work on the training data, before the model sees it.
+      </p>
+      <nav class="toc" aria-label="Sections">
+        <a href="#what">What imbalance is</a>
+        <a href="#causes">Where it comes from</a>
+        <a href="#severity">How severe</a>
+        <a href="#why">Why accuracy stops working</a>
+        <a href="#approaches">Three approaches</a>
+        <a href="#resample">Under- and oversampling</a>
+        <a href="#smote">SMOTE</a>
+        <a href="#hybrid">The hybrid</a>
+        <a href="#compare">All five, side by side</a>
+        <a href="#disease">A rare disease</a>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ==================== 1. WHAT IMBALANCE IS ==================== -->
+  <section class="chapter" id="what">
+    <div class="prose">
+      <h2><span class="steplabel">1</span>What class imbalance is</h2>
+      <p>
+        <strong>Class imbalance</strong> occurs when there are many more instances of some
+        classes than others, most often in binary classification. Fraud detection, loan
+        default prediction, spam detection, anomaly detection and outlier detection are all
+        imbalanced problems: the interesting case is the rare one.
+      </p>
+      <p>
+        Standard classification algorithms tend to be overwhelmed by the large class and
+        ignore the small one. Most of them were designed around the assumption of an equal,
+        or similar, number of cases in each class, and when that assumption fails the cheapest
+        way to be right most of the time is to predict the common class.
+      </p>
+      <p>
+        On the same homes as the <a href="classification.html">classification page</a>, whether a
+        home sells inside thirty days splits about evenly. In a slower market it does not. The
+        homes stay the same, the relationship between price and speed of sale stays the same,
+        and quick sales simply become rare.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 2. CAUSES ==================== -->
+  <section class="chapter" id="causes">
+    <div class="prose">
+      <h2><span class="steplabel">2</span>Where it comes from</h2>
+    </div>
+    <div class="figure" style="max-width:52rem">
+      <div class="split split--even">
+        <div class="card">
+          <h3>Biased sampling</h3>
+          <p class="small" style="margin-top:0.35rem">
+            The imbalance was caused by how the examples were collected or sampled from the
+            problem domain. The data are skewed because the collection was.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Errors in data collection</h3>
+          <p class="small" style="margin-top:0.35rem">
+            Mistakes made while collecting the observations, such as applying the wrong class
+            label to many of them. If training data come from a narrow region or a narrow slice
+            of time, one class may not be observed enough.
+          </p>
+        </div>
+      </div>
+      <div class="card" style="margin-top:0.9rem">
+        <h3>The problem domain</h3>
+        <p class="small" style="margin-top:0.35rem">
+          The imbalance is simply a property of the problem. One class naturally dominates:
+          legitimate emails outnumber spam, and healthy people outnumber people with cancer.
+          A slow housing market, where most homes do not sell in a month, is this kind.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 3. SEVERITY ==================== -->
+  <section class="chapter" id="severity">
+    <div class="prose">
+      <h2><span class="steplabel">3</span>How severe it is</h2>
+      <p>
+        A <strong>slight imbalance</strong> is uneven by a small amount, say 40% against 60%,
+        and is often not a concern: the problem can be treated like an ordinary classification
+        problem. A <strong>severe imbalance</strong> is uneven by a large amount, say 1% against
+        99%, with hundreds or thousands of examples in one class and tens in the other, and can
+        need specialised techniques.
+      </p>
+      <p>
+        The class with abundant examples is the <strong>majority class</strong> and the one with
+        few is the <strong>minority class</strong>. The minority is usually the class of most
+        interest, and it is the harder one to predict, because with fewer examples the model
+        struggles to learn what they look like.
+      </p>
+      <p>
+        <strong>Slow the market down.</strong> The model is refitted at every setting, on the
+        same homes, with the same two features.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">A slower market, the same model</div>
+      <div class="figure__sub" id="sev-sub"></div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Homes that sell within thirty days</span>
+          <input type="range" id="sev" min="1" max="50" step="1" value="50">
+          <output id="sev-out"></output>
+        </label>
+        <button class="btn" id="sev-slight">Slight: 40%</button>
+        <button class="btn" id="sev-severe">Severe: 1%</button>
+      </div>
+      <div class="stats" id="sev-stats"></div>
+      <div id="sev-chart" style="margin-top:1rem"></div>
+      <div class="legend" id="sev-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="sev-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 4. WHY ACCURACY STOPS WORKING ==================== -->
+  <section class="chapter" id="why">
+    <div class="prose">
+      <h2><span class="steplabel">4</span>Why accuracy stops working</h2>
+      <p>
+        Take credit card fraud, where perhaps 1% of transactions are fraudulent and 99% are
+        legitimate. Three things go wrong at once.
+      </p>
+      <ol>
+        <li><strong>A biased model.</strong> Trained on the imbalanced data without addressing
+          it, the model leans toward the majority class and predicts most transactions as
+          legitimate, reaching a high accuracy while failing to detect fraud.</li>
+        <li><strong>Accuracy is misleading.</strong> A model that calls every transaction
+          legitimate is 99% accurate and detects nothing.</li>
+        <li><strong>Rare class neglect.</strong> With very few fraudulent examples the model
+          struggles to learn what fraud looks like, and misses subtle cases, producing many
+          false negatives.</li>
+      </ol>
+      <p>
+        Precision, recall and F1 from the <a href="classification.html#metrics">confusion
+        matrix</a> matter most in exactly this situation. For a model that calls everything the
+        majority class:
+      </p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>Measure</th><th>Value</th><th>What it says</th></tr></thead>
+          <tbody id="why-table"></tbody>
+        </table>
+      </div>
+      <div class="keypoint">
+        <strong>Under class imbalance, high accuracy can hide a model that is completely useless
+        for the class you care about.</strong> Precision, recall and F1 on the minority class,
+        not overall accuracy, are the right way to judge these models.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 5. APPROACHES ==================== -->
+  <section class="chapter" id="approaches">
+    <div class="prose">
+      <h2><span class="steplabel">5</span>Three approaches</h2>
+    </div>
+    <div class="figure" style="max-width:52rem">
+      <div class="traits">
+        <div class="trait">Data-level methods<small>Change the collection of examples to balance the classes, or remove difficult samples</small></div>
+        <div class="trait">Algorithm-level methods<small>Modify the learning algorithm itself to reduce its bias toward the majority class</small></div>
+        <div class="trait">Hybrid methods<small>Combine the two</small></div>
+      </div>
+    </div>
+    <div class="prose">
+      <p>
+        Before any data-level method, check whether <strong>collecting more data</strong> is
+        possible. A larger dataset with more minority examples shrinks the problem at its
+        source. When cost or time rule that out, <strong>resampling</strong> builds a more
+        balanced training set from the one available, by removing majority examples
+        (<strong>undersampling</strong>) or generating new minority ones
+        (<strong>oversampling</strong>).
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 6. UNDER AND OVER ==================== -->
+  <section class="chapter" id="resample">
+    <div class="prose">
+      <h2><span class="steplabel">6</span>Random undersampling and random oversampling</h2>
+      <p>
+        <strong>Random undersampling</strong> removes majority examples at random until the two
+        classes are a similar size. <strong>Random oversampling</strong> duplicates minority
+        examples at random, drawing with replacement, until the classes are equal.
+      </p>
+    </div>
+    <div class="figure" style="max-width:52rem">
+      <div class="split split--even">
+        <div>
+          <div class="figure__title">Random undersampling</div>
+          <div id="us-bars" style="margin-top:0.5rem"></div>
+          <ul class="small" style="line-height:1.55;margin-top:0.6rem">
+            <li><b style="color:var(--good)">+</b> Cuts the excess majority examples</li>
+            <li><b style="color:var(--good)">+</b> Trains faster, on less data</li>
+            <li><b style="color:var(--critical)">−</b> Can throw away helpful information</li>
+            <li><b style="color:var(--critical)">−</b> Does nothing to improve the minority class</li>
+          </ul>
+        </div>
+        <div>
+          <div class="figure__title">Random oversampling</div>
+          <div id="os-bars" style="margin-top:0.5rem"></div>
+          <ul class="small" style="line-height:1.55;margin-top:0.6rem">
+            <li><b style="color:var(--good)">+</b> More minority examples to learn from</li>
+            <li><b style="color:var(--good)">+</b> Standard classifiers perform better</li>
+            <li><b style="color:var(--critical)">−</b> Copies raise the risk of overfitting</li>
+            <li><b style="color:var(--critical)">−</b> Trains slower, on more data</li>
+          </ul>
+        </div>
+      </div>
+      <div class="figure__note" id="uo-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 7. SMOTE ==================== -->
+  <section class="chapter" id="smote">
+    <div class="prose">
+      <h2><span class="steplabel">7</span>SMOTE</h2>
+      <p>
+        Random oversampling duplicates minority examples but adds nothing the model can learn
+        from: a copy of a point is the same point. Better to <em>synthesise</em> new examples
+        from the existing ones. That is the <strong>Synthetic Minority Oversampling
+        Technique</strong>, SMOTE, and its goal is new minority examples that resemble the
+        real ones.
+      </p>
+      <ol>
+        <li>Select a minority instance, A, at random.</li>
+        <li>Find its k nearest minority-class neighbours, typically k = 5.</li>
+        <li>Choose one of those neighbours, B, at random, and join A and B with a line
+          segment.</li>
+        <li>Place a new, synthetic instance at a random point along that segment.</li>
+      </ol>
+      <p>
+        <strong>SMOTE-NC</strong>, SMOTE for nominal and continuous features, is a variant that
+        handles datasets mixing continuous and categorical features.
+      </p>
+      <p>
+        <strong>Step through it.</strong> Every home drawn is a minority-class home from a
+        severely imbalanced training set.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">How SMOTE builds one home</div>
+      <div class="controls">
+        <button class="btn btn--primary" id="sm-step">Next step</button>
+        <button class="btn" id="sm-ten">Make ten more</button>
+        <button class="btn" id="sm-reset">Start again</button>
+        <label class="field"><span class="field__name">Neighbours (k)</span>
+          <input type="range" id="sm-k" min="1" max="8" step="1" value="5">
+          <output id="sm-k-out"></output>
+        </label>
+      </div>
+      <div class="split split--wide-left">
+        <div id="sm-chart"></div>
+        <div>
+          <div id="sm-steps"></div>
+        </div>
+      </div>
+      <div class="legend" id="sm-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="sm-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 8. HYBRID ==================== -->
+  <section class="chapter" id="hybrid">
+    <div class="prose">
+      <h2><span class="steplabel">8</span>The hybrid: SMOTE-NC with random undersampling</h2>
+      <p>Two steps, one from each side:</p>
+      <ol>
+        <li>Synthesise minority examples from their nearest neighbours.</li>
+        <li>Randomly remove majority examples, with or without replacement.</li>
+      </ol>
+      <div class="split split--even" style="margin-top:1rem">
+        <div class="card">
+          <h3 style="color:var(--good)">Advantages</h3>
+          <ul class="small" style="line-height:1.55;margin-top:0.35rem">
+            <li>Can handle categorical variables</li>
+            <li>Less computation, because some majority examples are removed</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="color:var(--critical)">Disadvantages</h3>
+          <ul class="small" style="line-height:1.55;margin-top:0.35rem">
+            <li>Can throw away helpful information</li>
+            <li>Sub-optimal performance with high-dimensional datasets</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 9. COMPARE ==================== -->
+  <section class="chapter" id="compare">
+    <div class="prose">
+      <h2><span class="steplabel">9</span>All five, side by side</h2>
+      <p>
+        The same severely imbalanced homes, resampled five ways, each used to grow one decision
+        tree. Resampling only ever touches the training set. The test set keeps the market's
+        real proportions, because that is the market the model will have to work in.
+      </p>
+      <p>
+        <strong>Switch between the training sets.</strong> The shading is where each tree
+        predicts a quick sale.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Five training sets, one test set</div>
+      <div class="controls">
+        <div class="segmented" id="cmp-mode">
+          <button type="button" data-s="original" aria-pressed="true">As collected</button>
+          <button type="button" data-s="under" aria-pressed="false">Undersample</button>
+          <button type="button" data-s="over" aria-pressed="false">Oversample</button>
+          <button type="button" data-s="smote" aria-pressed="false">SMOTE</button>
+          <button type="button" data-s="hybrid" aria-pressed="false">SMOTE + undersample</button>
+        </div>
+      </div>
+      <div class="split split--wide-left">
+        <div id="cmp-chart"></div>
+        <div>
+          <div id="cmp-bars"></div>
+          <div class="stats stats--2" id="cmp-stats" style="margin-top:0.9rem"></div>
+        </div>
+      </div>
+      <div class="legend" id="cmp-legend" style="margin-top:0.6rem"></div>
+      <div class="table-scroll" style="margin-top:1.2rem">
+        <table class="data" id="cmp-table"></table>
+      </div>
+      <div class="figure__note" id="cmp-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 10. RARE DISEASE ==================== -->
+  <section class="chapter" id="disease">
+    <div class="prose">
+      <h2><span class="steplabel">10</span>A rare disease</h2>
+      <p>
+        A hospital wants a model that flags patients likely to have a rare disease from their
+        test results and symptoms. Of 1,000 patients screened, only 50 have it: a prevalence
+        of 5%, the same imbalance as the severely imbalanced homes.
+      </p>
+      <p id="disease-lazy"></p>
+      <p>
+        The stakes differ from fraud detection. A missed fraud case costs money, but a missed
+        disease case can cost a life, so failing to catch the minority class is far more
+        serious than a false alarm. Rare class neglect applies with full force: with only 50
+        positive cases to learn from, the model has very little signal about what the disease
+        looks like, and may fail to recognise genuine cases, producing many false negatives.
+      </p>
+      <div class="keypoint" id="disease-keypoint"></div>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    EDPY 506, University of Alberta · Content follows the lectures of
+    Dr. Okan Bulut · <a href="index.html">Back to the index</a>
+  </div>
+</footer>
+
+<script type="module" src="assets/imbalance-page.js"></script>
+</body>
+</html>

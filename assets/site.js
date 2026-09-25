@@ -12,6 +12,9 @@ export const CHAPTERS = [
   { href: 'regression.html', short: 'Regression', title: 'Regression' },
   { href: 'trees.html', short: 'Trees & forests', title: 'Decision trees and random forests' },
   { href: 'classification.html', short: 'Classification', title: 'Classification' },
+  { href: 'imbalance.html', short: 'Imbalance', title: 'Imbalanced classes' },
+  { href: 'features.html', short: 'Features', title: 'Feature engineering' },
+  { href: 'tuning.html', short: 'Tuning', title: 'Model tuning' },
 ];
 
 /* Standalone pages that are not part of the topic sequence, shown in a

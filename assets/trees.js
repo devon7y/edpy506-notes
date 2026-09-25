@@ -147,6 +147,33 @@ export function randomForest(X, y, opts = {}) {
   return { trees, mtry, predict };
 }
 
+/* ---------- mean decrease in impurity ---------- */
+
+/**
+ * Mean decrease in impurity for one tree: at every split, how much the split
+ * reduced the squared error, credited to the feature it split on, then scaled
+ * to sum to 1. For a regression tree the impurity is the squared error, which
+ * every node already carries.
+ */
+export function treeImportance(node, p) {
+  const imp = new Array(p).fill(0);
+  const walk = (n) => {
+    if (!n.left) return;
+    imp[n.feature] += n.sse - n.left.sse - n.right.sse;
+    walk(n.left); walk(n.right);
+  };
+  walk(node);
+  const total = imp.reduce((a, b) => a + b, 0) || 1;
+  return imp.map((v) => v / total);
+}
+
+/** The forest's importance: each tree's, averaged. */
+export function forestImportance(rf, p) {
+  const acc = new Array(p).fill(0);
+  for (const t of rf.trees) treeImportance(t, p).forEach((v, j) => { acc[j] += v; });
+  return acc.map((v) => v / rf.trees.length);
+}
+
 /* ---------- permutation importance ---------- */
 
 export function mseOf(predict, X, y) {

@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feature engineering | EDPY 506</title>
+<meta name="description" content="Feature engineering: extraction and exploratory data analysis, scaling and encoding, and filter, wrapper and embedded feature selection, including recursive feature elimination.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">EDPY 506</a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Topics"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Topic 5</p>
+      <h1>Feature engineering</h1>
+      <p class="lede">
+        What goes into a model decides what can come out of it. Finding the useful columns,
+        putting them in a form a model can use, and dropping the ones that only add noise.
+      </p>
+      <nav class="toc" aria-label="Sections">
+        <a href="#parts">Three parts</a>
+        <a href="#extract">Extraction and EDA</a>
+        <a href="#scale">Scaling</a>
+        <a href="#encode">Categorical features</a>
+        <a href="#clean">Outliers and missing values</a>
+        <a href="#select">Why select features</a>
+        <a href="#filter">Filter methods</a>
+        <a href="#wrapper">Wrapper methods and RFE</a>
+        <a href="#domain">Domain knowledge first</a>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ==================== 1. THREE PARTS ==================== -->
+  <section class="chapter" id="parts">
+    <div class="prose">
+      <h2><span class="steplabel">1</span>Three parts</h2>
+      <p>
+        Feature engineering is three jobs done in sequence: find the information worth using,
+        reshape it into features a model can use, then keep only the features that help.
+      </p>
+    </div>
+    <div class="figure" style="max-width:52rem">
+      <div class="traits">
+        <div class="trait">Feature extraction<small>Identify the useful information in a dataset</small></div>
+        <div class="trait">Feature transformation<small>Turn raw features into more robust ones</small></div>
+        <div class="trait">Feature selection<small>Keep the most important and informative features</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 2. EXTRACTION ==================== -->
+  <section class="chapter" id="extract">
+    <div class="prose">
+      <h2><span class="steplabel">2</span>Feature extraction, and exploratory data analysis</h2>
+      <p>
+        <strong>Feature extraction</strong> pulls useful information out of a dataset. It aims
+        to compress the data into quantities an algorithm can manage, without distorting the
+        original data or losing significant information. Useful features come from three
+        places: <strong>domain knowledge</strong> about which features are relevant, a check of
+        <strong>data quality</strong> — how much is missing and how accurately it was entered —
+        and <strong>exploratory data analysis</strong>.
+      </p>
+      <p>
+        <strong>EDA</strong> summarises and visualises the data before any modelling, showing
+        which features are likely to be useful, redundant, or unreliable. Each check points to a
+        decision about what to keep:
+      </p>
+    </div>
+    <div class="figure figure--wide">
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>EDA check</th><th>What it shows</th><th>Feature selection decision</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Distributions</strong> — histograms, box plots</td><td>Skew, spread, and near-constant values</td><td>Drop near-zero-variance features; flag skewed ones for transformation</td></tr>
+            <tr><td><strong>Missing values</strong></td><td>The share and pattern of missing data in each feature</td><td>Drop features with heavy missingness, or impute them</td></tr>
+            <tr><td><strong>Outliers</strong></td><td>Extreme or implausible values</td><td>Fix data-entry errors before judging a feature's usefulness</td></tr>
+            <tr><td><strong>Feature–target relationships</strong> — scatter plots, group means</td><td>Which features vary with the outcome</td><td>Keep features with a clear relationship to the target</td></tr>
+            <tr><td><strong>Correlations among features</strong> — heat map</td><td>Redundant, highly correlated pairs</td><td>Keep one feature from each correlated pair to limit multicollinearity</td></tr>
+            <tr><td><strong>Category frequencies</strong> — bar charts</td><td>Rare or dominant categories</td><td>Merge rare categories; drop features with one dominant category</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 3. SCALING ==================== -->
+  <section class="chapter" id="scale">
+    <div class="prose">
+      <h2><span class="steplabel">3</span>Feature transformation, and scaling</h2>
+      <p>
+        <strong>Feature transformation</strong> turns raw features into more robust ones, from
+        one representation to another. It covers:
+      </p>
+      <ul>
+        <li><strong>Feature creation</strong> — merging several features into one, or splitting
+          one into several.</li>
+        <li><strong>Scaling</strong> — <strong>standardisation</strong>, the z-score, to a mean
+          of 0 and a standard deviation of 1; and <strong>normalisation</strong>, min-max, to a
+          range of 0 to 1.</li>
+        <li><strong>Transformation</strong> — a square root, which needs values of zero or more,
+          and a log or reciprocal, which need values above zero.</li>
+      </ul>
+      <div class="formula formula--left">
+        <span class="row"><b>Standardisation</b> &nbsp;<em>z</em> =
+          <span class="frac"><span><em>x</em> − mean</span><span>SD</span></span></span>
+        <span class="row"><b>Normalisation</b> &nbsp;<em>x</em>′ =
+          <span class="frac"><span><em>x</em> − min</span><span>max − min</span></span></span>
+      </div>
+      <p>
+        Scaling changes the <em>units</em> of a feature, not the <em>shape</em> of its
+        distribution. Both scalings are computed from the data itself, from its mean and
+        standard deviation or its minimum and maximum. <strong>Add a sixth home</strong>, far
+        older than the rest, and watch every other home's scaled value move with it.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Five homes' ages, scaled two ways</div>
+      <div class="controls">
+        <label class="field"><input type="checkbox" id="sc-outlier"> Add a sixth home, 120 years old</label>
+      </div>
+      <div class="split split--even">
+        <div class="table-scroll"><table class="data" id="sc-table"></table></div>
+        <div id="sc-strip"></div>
+      </div>
+      <div class="figure__note" id="sc-note"></div>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The same prices, three sets of units</div>
+      <div class="figure__sub" id="sh-sub"></div>
+      <div id="sh-chart"></div>
+      <div class="figure__note" id="sh-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 4. CATEGORICAL ==================== -->
+  <section class="chapter" id="encode">
+    <div class="prose">
+      <h2><span class="steplabel">4</span>Categorical features</h2>
+      <p>
+        A model needs numbers, so a category has to be turned into columns. There are two ways:
+      </p>
+      <ul>
+        <li><strong>One-hot encoding</strong> makes one 0/1 column for every category. It suits
+          tree-based models such as random forests, neural networks where multicollinearity is
+          not an issue, and regularised regression such as ridge, which handles correlated
+          features well.</li>
+        <li><strong>Dummy coding</strong> makes one column for every category but one. It suits
+          linear models, logistic regression, and any statistical analysis where perfect
+          multicollinearity — the <strong>dummy variable trap</strong> — ruins the stability
+          of the coefficients.</li>
+      </ul>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One neighbourhood column, encoded both ways</div>
+      <div class="table-scroll"><table class="data data--tight" id="enc-table"></table></div>
+      <div class="figure__note" id="enc-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 5. OUTLIERS AND MISSING ==================== -->
+  <section class="chapter" id="clean">
+    <div class="prose">
+      <h2><span class="steplabel">5</span>Outliers and missing values</h2>
+    </div>
+    <div class="figure" style="max-width:52rem">
+      <div class="split split--even">
+        <div class="card">
+          <h3>Handling outliers</h3>
+          <ul class="small" style="line-height:1.55;margin-top:0.35rem">
+            <li><b>Removal</b> of the outlying cases</li>
+            <li><b>Replacing</b> them by imputation, or recoding them as missing</li>
+            <li><b>Capping</b>: set a limit for the feature, and set every value beyond it to
+              the limit</li>
+            <li><b>Discretisation</b>: turn a continuous feature into a discrete one using a
+              series of intervals</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Handling missing values</h3>
+          <ul class="small" style="line-height:1.55;margin-top:0.35rem">
+            <li><b>Listwise deletion</b>: keep only cases complete on every feature</li>
+            <li><b>Pairwise deletion</b>: applicable only to linear models such as linear
+              regression</li>
+            <li><b>Imputation</b>: replace missing values with estimates. Avoid mean, mode or
+              median imputation; prefer multiple imputation, hot deck imputation, or multiple
+              imputation by chained equations</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 6. SELECTION ==================== -->
+  <section class="chapter" id="select">
+    <div class="prose">
+      <h2><span class="steplabel">6</span>Why select features</h2>
+      <p>
+        <strong>Feature selection</strong> identifies the most important and informative
+        features in a dataset. It is one of the most important steps in a machine learning
+        pipeline, because it has a significant effect on a model's performance and predictive
+        power. Its benefits: better model performance, shorter training time, less risk of
+        overfitting, and more sustainable models.
+      </p>
+      <p>There are three families of method:</p>
+    </div>
+    <div class="figure" style="max-width:56rem">
+      <div class="traits">
+        <div class="trait">Embedded<small>Selection happens inside the model's own fitting: lasso with cross-validation, and feature importance from trees, random forests and boosting</small></div>
+        <div class="trait">Filter<small>Faster and cheaper, but too simplistic: correlation analysis, and the chi-square test for categorical features</small></div>
+        <div class="trait">Wrapper<small>Selection as a search problem: forward selection, recursive feature elimination, and exhaustive search over every combination</small></div>
+      </div>
+    </div>
+    <div class="prose">
+      <p>
+        Lasso with cross-validation is on the <a href="regression.html#lasso">regression page</a>,
+        and feature importance from a random forest is on the
+        <a href="trees.html#importance">trees page</a>. The other two families follow.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 7. FILTER ==================== -->
+  <section class="chapter" id="filter">
+    <div class="prose">
+      <h2><span class="steplabel">7</span>A filter method: correlation</h2>
+      <p>
+        Correlation analysis keeps the features that are highly correlated with the target
+        and eliminates features that are highly correlated with each other, keeping one of each
+        such pair. Correlation measures a straight-line relationship between numbers, so it
+        applies to numeric features; the chi-square test does the same job for categorical
+        ones.
+      </p>
+      <p>
+        <strong>Move the two thresholds.</strong> The heat map is every numeric feature of the
+        homes against every other, with the price as the last column.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Filtering by correlation</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Keep if correlation with price is at least</span>
+          <input type="range" id="f-min" min="0" max="40" step="1" value="10">
+          <output id="f-min-out"></output>
+        </label>
+        <label class="field"><span class="field__name">Drop one of a pair correlated above</span>
+          <input type="range" id="f-pair" min="40" max="100" step="1" value="80">
+          <output id="f-pair-out"></output>
+        </label>
+      </div>
+      <div class="split split--wide-left">
+        <div id="f-heat"></div>
+        <div id="f-list"></div>
+      </div>
+      <div class="figure__note" id="f-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 8. WRAPPER ==================== -->
+  <section class="chapter" id="wrapper">
+    <div class="prose">
+      <h2><span class="steplabel">8</span>Wrapper methods, and recursive feature elimination</h2>
+      <p>
+        A wrapper treats feature selection as a search. <strong>Forward selection</strong>
+        starts with no features and adds one at a time, whichever improves the model most.
+        <strong>Recursive feature elimination</strong>, RFE, runs the other way: it considers
+        smaller and smaller sets of features.
+      </p>
+      <ol>
+        <li>Train an estimator, typically a random forest, on the initial set of features, and
+          obtain the importance of each.</li>
+        <li>Prune the least important features from the set.</li>
+        <li>Repeat on the pruned set until the desired number of features remains.</li>
+      </ol>
+      <div class="callout">
+        <strong>The researcher makes three choices RFE cannot make for them:</strong> how many
+        features to keep in total, how many to drop in each round, and which algorithm judges
+        importance.
+      </div>
+      <p>
+        The heart-disease example from the lecture tested RFE by planting four variables among
+        thirteen real clinical features: two of pure random noise, one weakly correlated with
+        the outcome, and one moderately correlated. The homes already carry three noise columns.
+        <strong>Plant the other two</strong> and run both methods.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Adding features, and taking them away</div>
+      <div class="figure__sub" id="w-sub"></div>
+      <div class="controls">
+        <div class="segmented" id="w-method">
+          <button type="button" data-m="rfe" aria-pressed="true">Recursive feature elimination</button>
+          <button type="button" data-m="forward" aria-pressed="false">Forward selection</button>
+        </div>
+        <label class="field"><input type="checkbox" id="w-plant" checked> Plant a weak and a moderate variable</label>
+      </div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Features to keep</span>
+          <input type="range" id="w-keep" min="1" max="11" step="1" value="4">
+          <output id="w-keep-out"></output>
+        </label>
+        <button class="btn" id="w-best">Keep the number cross-validation likes best</button>
+        <span class="small muted" id="w-busy"></span>
+      </div>
+      <div class="split split--wide-left">
+        <div id="w-chart"></div>
+        <div id="w-list"></div>
+      </div>
+      <div class="figure__note" id="w-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 9. DOMAIN KNOWLEDGE ==================== -->
+  <section class="chapter" id="domain">
+    <div class="prose">
+      <h2><span class="steplabel">9</span>Domain knowledge comes first</h2>
+      <p>
+        RFE selects features from the data alone. It finds whatever patterns exist, but it
+        cannot tell a meaningful one from a coincidental one. Domain knowledge is what lets
+        the results be judged.
+      </p>
+    </div>
+    <div class="figure" style="max-width:56rem">
+      <div class="traits">
+        <div class="trait">Before RFE<small>Predict which features should matter, from how the problem works</small></div>
+        <div class="trait">Run RFE<small>It finds the patterns in the data, meaningful and coincidental alike</small></div>
+        <div class="trait">After RFE<small>Check whether the selected features make sense given what you know</small></div>
+      </div>
+    </div>
+    <div class="prose">
+      <div class="keypoint" id="domain-keypoint"></div>
+      <p id="domain-planted"></p>
+      <details class="aside">
+        <summary>Why house number scores above zero at all</summary>
+        <p class="small">
+          The importance a random forest reports is the total reduction in error from every
+          split on a feature. A column with thousands of distinct values, such as a house
+          number, offers thousands of places to split, and on a finite sample some of them
+          will happen to separate a few expensive homes from a few cheap ones. Each such split
+          is credited to the column. That is a property of the importance measure the forest
+          uses, not evidence that the column matters, and it is exactly the kind of result
+          domain knowledge exists to question.
+        </p>
+      </details>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    EDPY 506, University of Alberta · Content follows the lectures of
+    Dr. Okan Bulut · <a href="index.html">Back to the index</a>
+  </div>
+</footer>
+
+<script type="module" src="assets/features-page.js"></script>
+</body>
+</html>

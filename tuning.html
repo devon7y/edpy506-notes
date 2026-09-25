@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model tuning | EDPY 506</title>
+<meta name="description" content="Model fine-tuning: parameters and hyperparameters, k-fold cross-validation, grid and random search, and a tuning workflow that keeps the test set for the very end.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">EDPY 506</a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Topics"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Topic 6</p>
+      <h1>Model tuning</h1>
+      <p class="lede">
+        Most models in the course have settings the data cannot choose for them. Finding good
+        values for those settings without fooling yourself about how well the result will do.
+      </p>
+      <nav class="toc" aria-label="Sections">
+        <a href="#hyper">Parameters and hyperparameters</a>
+        <a href="#why">Why tune</a>
+        <a href="#cv">Cross-validation</a>
+        <a href="#search">Grid and random search</a>
+        <a href="#models">Tuning three models</a>
+        <a href="#grid">A grid search</a>
+        <a href="#workflow">The workflow</a>
+        <a href="#tradeoffs">Practical trade-offs</a>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ==================== 1. HYPERPARAMETERS ==================== -->
+  <section class="chapter" id="hyper">
+    <div class="prose">
+      <h2><span class="steplabel">1</span>Parameters and hyperparameters</h2>
+      <p>
+        A <strong>parameter</strong> is learned from the data during training: a regression
+        coefficient, a split point in a tree. A <strong>hyperparameter</strong> is set before
+        training begins and controls how the learning itself behaves: the regularisation
+        strength in lasso or ridge, the maximum depth of a decision tree, the number of trees
+        in a random forest.
+      </p>
+      <p>
+        A hyperparameter cannot be estimated from a single training pass, because training
+        takes it as given. It has to be <strong>searched for</strong>.
+      </p>
+    </div>
+    <div class="figure figure--wide">
+      <div class="figure__title">The same distinction, in every model so far</div>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>Model</th><th>Parameters, learned from the data</th><th>Hyperparameters, set before training</th></tr></thead>
+          <tbody>
+            <tr><td><a href="regression.html#ols">Linear regression</a></td><td>Intercept and slopes</td><td>—</td></tr>
+            <tr><td><a href="regression.html#ridge">Ridge and lasso</a></td><td>Intercept and slopes</td><td>Regularisation strength, λ</td></tr>
+            <tr><td><a href="trees.html#hyper">Decision tree</a></td><td>Which feature each node splits on, where, and the value in each leaf</td><td>Maximum depth, minimum split, minimum leaf, cost complexity α</td></tr>
+            <tr><td><a href="trees.html#forest">Random forest</a></td><td>Every tree's splits and leaves</td><td>Number of trees, features per split, maximum depth</td></tr>
+            <tr><td><a href="classification.html#logistic">Logistic regression</a></td><td><em>β</em><sub>0</sub> and <em>β</em><sub>1</sub></td><td>—</td></tr>
+            <tr><td><a href="classification.html#knn">k-nearest neighbours</a></td><td>None: the training data are the model</td><td>k, and the distance measure</td></tr>
+            <tr><td><a href="classification.html#svm">Support vector machine</a></td><td>The hyperplane</td><td>C, the cost of a violation</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 2. WHY ==================== -->
+  <section class="chapter" id="why">
+    <div class="prose">
+      <h2><span class="steplabel">2</span>Why tune a model at all</h2>
+      <p>
+        Default hyperparameter values are rarely the best ones for a particular dataset.
+        Fine-tuning looks for the values that give the best <em>generalisation</em>
+        performance — not the best fit to the training data, which the deepest tree and the
+        smallest λ always win.
+      </p>
+      <p>
+        The benefits: better accuracy on new, unseen data; less risk of underfitting or
+        overfitting; and a model whose complexity matches the problem's. The risk of skipping
+        it is a model that looks adequate during development and performs poorly once it is
+        deployed.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 3. CROSS-VALIDATION ==================== -->
+  <section class="chapter" id="cv">
+    <div class="prose">
+      <h2><span class="steplabel">3</span>Cross-validation: comparing settings fairly</h2>
+      <p>
+        Any search needs an honest way to compare candidate settings, and that is the job of
+        <strong>k-fold cross-validation</strong>:
+      </p>
+      <ol>
+        <li>Split the training data into k folds of equal size.</li>
+        <li>Train on k − 1 folds and evaluate on the remaining one.</li>
+        <li>Repeat until every fold has been the evaluation set once.</li>
+        <li>Average the performance across all k folds.</li>
+      </ol>
+      <p>
+        That gives a more stable estimate than a single train-test split, and the whole
+        procedure is repeated for every combination of hyperparameters under consideration.
+        With one split, the score depends on which rows happen to land in the test set. With
+        five folds every row is tested exactly once.
+      </p>
+      <p>
+        <strong>Draw some splits.</strong> Each one scores the same model on the same homes;
+        only the division into training and test rows changes.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One split, or five folds</div>
+      <div class="figure__sub" id="cv-sub"></div>
+      <div class="controls">
+        <button class="btn btn--primary" id="cv-one">Draw one split</button>
+        <button class="btn" id="cv-many">Draw thirty</button>
+        <button class="btn" id="cv-reset">Start again</button>
+      </div>
+      <div class="split split--even">
+        <div id="cv-scheme"></div>
+        <div id="cv-dots"></div>
+      </div>
+      <div class="stats stats--2" id="cv-stats" style="margin-top:1rem"></div>
+      <div class="figure__note" id="cv-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 4. GRID AND RANDOM SEARCH ==================== -->
+  <section class="chapter" id="search">
+    <div class="prose">
+      <h2><span class="steplabel">4</span>Grid search and random search</h2>
+      <p>
+        <strong>Grid search</strong> fixes a set of values for each hyperparameter and tries
+        every combination. It is exhaustive and easy to interpret, and it becomes expensive
+        quickly as the number of hyperparameters grows. <strong>Random search</strong> samples
+        a fixed number of combinations at random from the same space. It often finds settings
+        as good with far fewer trials, especially when some hyperparameters matter more than
+        others. Both are normally combined with cross-validation to score each candidate.
+      </p>
+      <p>
+        <strong>Spend the same budget both ways.</strong> The background is the real
+        cross-validated error of a random forest at every combination of its maximum depth and
+        its number of trees.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The same number of trials, spent two ways</div>
+      <div class="controls">
+        <label class="field"><span class="field__name">Trials</span>
+          <input type="range" id="gs-budget" min="2" max="5" step="1" value="3">
+          <output id="gs-budget-out"></output>
+        </label>
+        <button class="btn" id="gs-redraw">Draw new random trials</button>
+        <span class="small muted" id="gs-busy"></span>
+      </div>
+      <div class="split split--even">
+        <div id="gs-grid"></div>
+        <div id="gs-rand"></div>
+      </div>
+      <div class="stats" id="gs-stats" style="margin-top:1rem"></div>
+      <div class="figure__note" id="gs-note"></div>
+    </div>
+
+    <div class="figure" style="max-width:48rem">
+      <div class="figure__title">What a search costs</div>
+      <div class="figure__sub">Models fitted to try a given number of values for each hyperparameter, with five-fold cross-validation.</div>
+      <div id="gs-cost"></div>
+      <div class="figure__note" id="gs-cost-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 5. THREE MODELS ==================== -->
+  <section class="chapter" id="models">
+    <div class="prose">
+      <h2><span class="steplabel">5</span>Tuning three models</h2>
+      <p>
+        <strong>Lasso and ridge</strong> hinge on λ. A small λ lets the model fit the training
+        data closely and risks overfitting; a large λ shrinks the coefficients harder, which
+        can help generalisation and underfits if pushed too far. In lasso a large enough λ
+        also sets coefficients to exactly zero, which selects features. Define a range of
+        candidate values, evaluate each by cross-validation, and choose the one with the lowest
+        cross-validated error.
+      </p>
+      <p>
+        <strong>Decision trees</strong> have several hyperparameters controlling how large they
+        may grow: maximum depth, the minimum samples to split a node, the minimum samples in a
+        leaf. A tree with no depth limit tends to overfit by memorising the training data, and
+        limiting it encourages simpler trees that generalise.
+      </p>
+      <p>
+        <strong>Random forests</strong> add their own: the number of trees, the number of
+        features considered at each split, and the depth of each tree. More trees generally
+        improve stability at the cost of training time, with diminishing returns past a certain
+        point. The number of features per split controls how different the trees are from one
+        another, which is an important lever on the bias–variance trade-off.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One hyperparameter each, training error against cross-validated error</div>
+      <div class="figure__sub" id="tm-sub"></div>
+      <div class="split split--three" id="tm-panels">
+        <div id="tm-lasso"></div>
+        <div id="tm-tree"></div>
+        <div id="tm-forest"></div>
+      </div>
+      <div class="legend" id="tm-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="tm-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 6. A GRID SEARCH ==================== -->
+  <section class="chapter" id="grid">
+    <div class="prose">
+      <h2><span class="steplabel">6</span>A grid search for a random forest</h2>
+      <p>
+        Four maximum depths against four numbers of features per split: sixteen combinations,
+        each scored by five-fold cross-validation, which is eighty forests.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width:52rem">
+      <div class="figure__title">Cross-validated error, by combination</div>
+      <div class="figure__sub" id="rg-sub"></div>
+      <div id="rg-heat"></div>
+      <div class="figure__note" id="rg-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 7. WORKFLOW ==================== -->
+  <section class="chapter" id="workflow">
+    <div class="prose">
+      <h2><span class="steplabel">7</span>The workflow, and why the test set waits</h2>
+      <p>
+        Fine-tuning follows the same five steps whatever the model:
+      </p>
+    </div>
+    <div class="figure figure--wide">
+      <div class="wf">
+        <div class="wf__step"><span class="steplabel">1</span><b>Define the space</b><small>Pick the hyperparameters and a range of values for each</small></div>
+        <div class="wf__step"><span class="steplabel">2</span><b>Choose a search</b><small>Grid search for a small space, random search for a larger one</small></div>
+        <div class="wf__step"><span class="steplabel">3</span><b>Cross-validate</b><small>Score every candidate combination on the training data</small></div>
+        <div class="wf__step"><span class="steplabel">4</span><b>Select the best</b><small>Keep the combination with the best cross-validated score</small></div>
+        <div class="wf__step wf__step--test"><span class="steplabel">5</span><b>Refit and test</b><small>Refit on the full training set, then evaluate once on the test set</small></div>
+      </div>
+      <div class="wf__bands">
+        <span>Training data only, through cross-validation</span>
+        <span>Held-out test set</span>
+      </div>
+    </div>
+    <div class="prose">
+      <div class="callout">
+        <strong>The test set is used only at the very end, never during the search itself.</strong>
+      </div>
+      <p>
+        <strong>Break the rule and see what it costs.</strong> The same tuning job is run both
+        ways, many times over, and each result is then checked on homes neither method has seen.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Tuning a tree on the test set, against tuning it by cross-validation</div>
+      <div class="figure__sub" id="wf-sub"></div>
+      <div class="controls">
+        <span class="small muted" id="wf-busy"></span>
+      </div>
+      <div id="wf-chart"></div>
+      <div class="stats stats--2" id="wf-stats" style="margin-top:1rem"></div>
+      <div class="figure__note" id="wf-note"></div>
+    </div>
+  </section>
+
+  <!-- ==================== 8. TRADEOFFS ==================== -->
+  <section class="chapter" id="tradeoffs">
+    <div class="prose">
+      <h2><span class="steplabel">8</span>Practical trade-offs</h2>
+      <ul>
+        <li><strong>Search cost grows quickly.</strong> Grid search scales multiplicatively with
+          the number of hyperparameters and the values tried for each.</li>
+        <li><strong>Returns diminish.</strong> Past a point, more tuning buys a small gain in
+          performance for a large increase in computation.</li>
+        <li><strong>Go from coarse to fine.</strong> A wide, coarse grid or a random search
+          locates the promising region; a second, finer search then narrows the range around
+          those values.</li>
+        <li><strong>Not every hyperparameter needs equal attention.</strong> Some, such as the
+          number of trees in a random forest, matter less once a reasonable value is reached;
+          others, such as tree depth, can change performance substantially.</li>
+      </ul>
+      <p id="tradeoff-evidence"></p>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    EDPY 506, University of Alberta · Content follows the lectures of
+    Dr. Okan Bulut · <a href="index.html">Back to the index</a>
+  </div>
+</footer>
+
+<script type="module" src="assets/tuning-page.js"></script>
+</body>
+</html>

@@ -14,6 +14,9 @@ when you do.
 | [Regression](regression.html) | Least squares, R² and RMSE, multiple regression, bias and variance, under- and overfitting, ridge, lasso, choosing λ by cross-validation |
 | [Decision trees and random forests](trees.html) | Where a split comes from, growing and overgrowing a tree, cost-complexity pruning, hyperparameters, random forests, permutation importance |
 | [Classification](classification.html) | Why a line cannot predict a probability, logistic regression, k-nearest neighbours, support vector machines, the confusion matrix, precision and recall, the threshold, ROC and AUC |
+| [Imbalanced classes](imbalance.html) | What imbalance is and why accuracy misleads, random undersampling and oversampling, SMOTE, the hybrid, comparing them on a rare class |
+| [Feature engineering](features.html) | Extraction, scaling, encoding, cleaning, filter methods, forward selection and recursive feature elimination, domain knowledge |
+| [Model tuning](tuning.html) | Parameters and hyperparameters, cross-validation, grid and random search, tuning lasso, trees and forests, why the test set waits |
 
 ## Running it locally
 
@@ -31,7 +34,7 @@ directly, so run `npm run check` before pushing.
 ## Checks
 
 ```bash
-npm test        # unit tests for the regression and tree implementations
+npm test        # unit tests for the maths behind every page
 npm run check   # those, a prose audit, then every page driven in a real browser
 ```
 

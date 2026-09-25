@@ -40,8 +40,10 @@ RULES = [
 ]
 
 TARGETS = ["index.html", "regression.html", "trees.html", "classification.html",
+           "imbalance.html", "features.html", "tuning.html",
            "assets/regression-page.js", "assets/trees-page.js",
-           "assets/classification-page.js"]
+           "assets/classification-page.js", "assets/imbalance-page.js",
+           "assets/features-page.js", "assets/tuning-page.js"]
 
 
 def prose_of(path: Path) -> str:

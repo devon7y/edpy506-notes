@@ -119,7 +119,12 @@ function sampleEdmonton(seed = 1, n = 120, fixed = {}) {
     r.over = num('over', () => Math.max(-22, Math.min(26, 8.5 * gauss(rand))));
     r.asking = r.price * (1 + r.over / 100);
     r.pFast = 1 / (1 + Math.exp(-DAYS_LOGIT(r.over, r.lrt)));
-    r.fast = rand() < r.pFast ? 1 : 0;
+    /* The uniform draw that decides the sale is kept, not just its outcome.
+       Re-thresholding the same draw against a rarer probability gives the
+       label in a slower market without drawing anything new, so the random
+       stream every other page depends on is untouched. */
+    r.u = rand();
+    r.fast = r.u < r.pFast ? 1 : 0;
     rows.push(r);
   }
   return rows;
@@ -233,6 +238,28 @@ export function treeDesign(ds, rows) {
     names: ds.features.map((f) => f.label),
     features: ds.features,
   };
+}
+
+/**
+ * Labels for the same homes in a slower market, where quick sales are rarer.
+ *
+ * The market is a shift subtracted from every home's log odds of a quick
+ * sale: the homes and the relationship stay the same and only the base rate
+ * falls. Each label reuses the home's own uniform draw, so raising the shift
+ * can only turn a quick sale into a slow one, never the reverse. The shift is
+ * found by bisection so that the labels come out at the requested share.
+ */
+export function marketLabels(rows, share) {
+  const logit = rows.map((r) => Math.log(r.pFast / (1 - r.pFast)));
+  const labelsAt = (shift) => rows.map((r, i) => (r.u < 1 / (1 + Math.exp(-(logit[i] - shift))) ? 1 : 0));
+  const rate = (shift) => labelsAt(shift).reduce((s, v) => s + v, 0) / rows.length;
+  let lo = -8, hi = 12;
+  for (let it = 0; it < 60; it++) {
+    const mid = (lo + hi) / 2;
+    if (rate(mid) > share) lo = mid; else hi = mid;
+  }
+  const shift = (lo + hi) / 2;
+  return { y: labelsAt(shift), shift, share: rate(shift) };
 }
 
 /** Rows plus the 0/1 label, for the classification page. */
