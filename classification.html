@@ -34,8 +34,8 @@
         <a href="#svm">Support vector machines</a>
         <a href="#confusion">The confusion matrix</a>
         <a href="#metrics">Accuracy, precision, recall, F1</a>
-        <a href="#threshold">The threshold</a>
-        <a href="#roc">ROC and AUC</a>
+        <a href="#threshold">The threshold and ROC</a>
+        <a href="#auc">AUC</a>
       </nav>
     </div>
   </section>
@@ -542,10 +542,10 @@
     </div>
   </section>
 
-  <!-- ==================== 9. THRESHOLD ==================== -->
+  <!-- ==================== 9. THRESHOLD AND ROC ==================== -->
   <section class="chapter" id="threshold">
     <div class="prose">
-      <h2><span class="steplabel">9</span>The threshold is a choice</h2>
+      <h2><span class="steplabel">9</span>The threshold, and the ROC curve</h2>
       <p>
         What a classification model returns is a probability. Turning that into a category
         requires a <strong>classification threshold</strong>, also called the decision
@@ -554,85 +554,67 @@
         changing the model at all.
       </p>
       <p>
-        <strong>Move the threshold</strong> and watch the four cells and the four metrics
-        move with it.
+        The <strong>receiver operating characteristic</strong> curve evaluates a model at
+        every threshold at once. It compares true positives against false positives at each
+        one: the horizontal axis is the false positive rate, the vertical axis is the true
+        positive rate, and each point on the curve is one threshold. A classifier that
+        predicts at random traces the diagonal, and a perfect one goes straight up the left
+        edge and along the top. Curves above the diagonal are decent and the higher they sit
+        the better. Anything below the diagonal performs worse than guessing. ROC curves are
+        particularly useful for comparing classifiers built from different algorithms or
+        different settings.
+      </p>
+      <p>
+        <strong>Move the threshold</strong>, then <strong>change the model</strong>. The two
+        controls do different things, and the charts show which.
       </p>
     </div>
 
     <div class="figure figure--wide">
-      <div class="figure__title">One model, every threshold</div>
+      <div class="figure__title">One threshold, three views</div>
+      <div class="figure__sub">
+        The predicted probabilities for <span id="tv-n"></span> held-out homes, split by what
+        actually happened; the same threshold on the ROC curve; and the counts it produces.
+      </div>
       <div class="controls">
-        <label class="field"><span class="field__name">Classification threshold</span>
+        <label class="field"><span class="field__name">Threshold</span>
           <input type="range" id="thr" min="2" max="98" step="1" value="50">
           <output id="thr-out"></output>
         </label>
-        <button class="btn" id="thr-half">Back to 0.5</button>
-        <button class="btn" id="thr-recall">Best recall the model can give</button>
-        <button class="btn" id="thr-f1">Best F1</button>
-      </div>
-      <div id="thr-strip"></div>
-      <div class="split split--even" style="margin-top:1.2rem">
-        <div id="thr-cm"></div>
-        <div>
-          <div class="stats stats--2" id="thr-metrics"></div>
-          <div id="thr-verdict" class="callout" style="margin-top:0.8rem"></div>
+        <div class="segmented" id="tv-model">
+          <button type="button" data-m="lrt" aria-pressed="false">Distance to LRT alone</button>
+          <button type="button" data-m="over" aria-pressed="false">Asking price alone</button>
+          <button type="button" data-m="four" aria-pressed="true">Four features</button>
         </div>
       </div>
-      <div class="figure__note" id="thr-note"></div>
+      <div class="controls">
+        <button class="btn" id="thr-half">Back to 0.5</button>
+        <button class="btn" id="thr-f1">Best F1</button>
+        <button class="btn" id="thr-recall">Catch every quick sale</button>
+      </div>
+      <div class="split split--roc">
+        <div id="tv-dist"></div>
+        <div id="tv-roc"></div>
+      </div>
+      <div class="split split--even" style="margin-top:1.1rem">
+        <div id="tv-cm"></div>
+        <div class="stats stats--2" id="tv-metrics"></div>
+      </div>
+      <div class="figure__note" id="tv-note"></div>
     </div>
   </section>
 
-  <!-- ==================== 10. ROC AND AUC ==================== -->
-  <section class="chapter" id="roc">
+  <!-- ==================== 10. AUC ==================== -->
+  <section class="chapter" id="auc">
     <div class="prose">
-      <h2><span class="steplabel">10</span>ROC and AUC</h2>
-      <p>
-        The <strong>receiver operating characteristic</strong> curve evaluates a model across
-        every threshold at once. It compares true positives against false positives at each
-        one: the horizontal axis is the false positive rate, the vertical axis is the true
-        positive rate, and each point on the curve is one threshold.
-      </p>
-      <p>
-        Reading it: a classifier that predicts at random traces the diagonal, and a perfect
-        one goes straight up the left edge and along the top. Curves above the diagonal are
-        decent, and the higher up they sit the better. Anything below the diagonal performs
-        worse than guessing.
-      </p>
-      <p>
-        ROC curves are particularly useful for comparing several classifiers built from
-        different algorithms or different settings.
-      </p>
-    </div>
-
-    <div class="figure figure--wide">
-      <div class="figure__title">Every threshold at once</div>
-      <div class="controls">
-        <label class="field"><span class="field__name">Threshold</span>
-          <input type="range" id="roc-thr" min="2" max="98" step="1" value="50">
-          <output id="roc-thr-out"></output>
-        </label>
-        <label class="field">
-          <input type="checkbox" id="roc-compare"> Compare against a weaker model
-        </label>
-      </div>
-      <div class="split split--even">
-        <div id="roc-chart"></div>
-        <div>
-          <div class="stats stats--1" id="roc-stats"></div>
-          <div class="figure__note" id="roc-read" style="margin-top:0.6rem"></div>
-        </div>
-      </div>
-      <div class="figure__note" id="roc-note"></div>
-    </div>
-
-    <div class="prose">
-      <h3>The area under it</h3>
+      <h2><span class="steplabel">10</span>The area under the curve</h2>
       <p>
         <strong>AUC</strong> measures the entire two-dimensional area underneath the ROC
         curve, giving an aggregate measure of performance across all possible thresholds. It
         runs from 0 to 1 and higher is better. A perfect classifier scores 1 and a random one
         scores 0.5, so anything under 0.5 indicates very poor performance.
       </p>
+      <p id="auc-reading"></p>
       <div class="callout callout--warn">
         <strong>AUC treats every classification error equally</strong>, ignoring the
         consequences of one kind over another. On a cancer screen a missed case and a false

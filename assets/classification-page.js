@@ -607,37 +607,46 @@ const EVAL = (() => {
   const { rows } = labelled(ds, 5, 400);
   const d = classDesign(ds, rows, ['over', 'lrt', 'size', 'age']);
   const sp = split(rows, d.y, 0.65, rng(7));
-  const f = logisticFit(sp.train.map((i) => d.X[i]), sp.train.map((i) => d.y[i]));
   const y = sp.test.map((i) => d.y[i]);
-  const s = sp.test.map((i) => f.prob(d.X[i]));
-  /* a deliberately weaker model, fitted on one feature, for the ROC comparison */
-  const fWeak = logisticFit(sp.train.map((i) => [d.X[i][1]]), sp.train.map((i) => d.y[i]));
-  const sWeak = sp.test.map((i) => fWeak.prob([d.X[i][1]]));
-  return { rows, ...d, ...sp, f, y, s, sWeak, A: auc(y, s), Aweak: auc(y, sWeak) };
+  /* Three models of increasing strength, so that changing the model visibly
+     moves the whole ROC curve while changing the threshold only moves a point
+     along it. Columns index into d.X: 0 asking price, 1 LRT, 2 size, 3 age. */
+  const fitOn = (cols) => {
+    const f = logisticFit(sp.train.map((i) => cols.map((c) => d.X[i][c])), sp.train.map((i) => d.y[i]));
+    const s = sp.test.map((i) => f.prob(cols.map((c) => d.X[i][c])));
+    return { f, s, A: auc(y, s) };
+  };
+  const models = {
+    lrt: { name: 'distance to the LRT alone', ...fitOn([1]) },
+    over: { name: 'asking price alone', ...fitOn([0]) },
+    four: { name: 'four features', ...fitOn([0, 1, 2, 3]) },
+  };
+  return { rows, ...d, ...sp, y, models, s: models.four.s, A: models.four.A };
 })();
 
-/** The four cells, drawn as the 2 x 2 grid from the lecture. */
-function confusionGrid(hostId, cm, opts = {}) {
-  const { highlight = null } = opts;
-  const cell = (label, n, kind, sub) => {
-    const right = kind === 'tp' || kind === 'tn';
-    return `<div class="cm__cell${right ? ' cm__cell--right' : ''}${highlight === kind ? ' cm__cell--on' : ''}">
-      <div class="cm__n">${n}</div>
+/** The four cells, laid out as in the lecture: actual down the side,
+    predicted across the top. */
+function confusionGrid(hostId, cm) {
+  const n = cm.tp + cm.fn + cm.fp + cm.tn || 1;
+  const cell = (label, count, wrong, sub) =>
+    `<div class="cm__cell${wrong ? ' cm__cell--wrong' : ''}" style="--share:${(count / n).toFixed(3)}">
+      <div class="cm__n">${count}</div>
       <div class="cm__label">${label}</div>
       <div class="cm__sub">${sub}</div>
     </div>`;
-  };
   document.getElementById(hostId).innerHTML = `
     <div class="cm">
-      <div></div>
-      <div class="cm__axis">Predicted: sold fast</div>
-      <div class="cm__axis">Predicted: still listed</div>
-      <div class="cm__axis cm__axis--side">Actually sold fast</div>
-      ${cell('True positive', cm.tp, 'tp', 'said it would sell, and it did')}
-      ${cell('False negative', cm.fn, 'fn', 'said it would not, but it did · Type II')}
-      <div class="cm__axis cm__axis--side">Actually still listed</div>
-      ${cell('False positive', cm.fp, 'fp', 'said it would sell, and it did not · Type I')}
-      ${cell('True negative', cm.tn, 'tn', 'said it would not, and it did not')}
+      <div></div><div></div><div class="cm__head" style="grid-column:3 / span 2">Predicted</div>
+      <div></div><div></div>
+      <div class="cm__collab">Sold fast</div>
+      <div class="cm__collab">Still listed</div>
+      <div class="cm__head cm__head--side" style="grid-row:span 2">Actual</div>
+      <div class="cm__rowlab">Sold fast</div>
+      ${cell('True positive', cm.tp, false, 'correctly flagged')}
+      ${cell('False negative', cm.fn, true, 'missed · Type II')}
+      <div class="cm__rowlab">Still listed</div>
+      ${cell('False positive', cm.fp, true, 'false alarm · Type I')}
+      ${cell('True negative', cm.tn, false, 'correctly passed over')}
     </div>`;
 }
 
@@ -734,167 +743,195 @@ function confusionGrid(hostId, cm, opts = {}) {
   update();
 }
 
-/* ---- the threshold ---- */
+/* ---- one threshold, three views ----
+   After the Classifiers primer's figure of the same name: the score
+   distributions and the ROC curve side by side under one threshold, so that
+   moving the threshold visibly slides a point along a fixed curve, while
+   changing the model moves the curve itself. The histograms are mirrored,
+   quick sales above the axis and the rest below, so the four regions the
+   threshold cuts them into are the four cells of the confusion matrix. */
 {
   const thrEl = document.getElementById('thr');
-  const stripHost = document.getElementById('thr-strip');
-  const GRID = Array.from({ length: 97 }, (_, i) => (i + 2) / 100);
-  const AT = GRID.map((t) => {
-    const cm = confusion(EVAL.y, atThreshold(EVAL.s, t));
-    return { t, cm, m: classMetrics(cm) };
-  });
-  const bestF1 = AT.reduce((a, b) => ((b.m.f1 || 0) > (a.m.f1 || 0) ? b : a));
-  /* the highest threshold that still catches every positive */
-  const fullRecall = AT.filter((a) => a.m.recall >= 0.999).reduce((a, b) => (b.t > a.t ? b : a), AT[0]);
+  const distHost = document.getElementById('tv-dist');
+  const rocHost = document.getElementById('tv-roc');
+  let key = 'four';
+  document.getElementById('tv-n').textContent = EVAL.y.length;
 
-  let drawStrip;
+  const at = (t) => {
+    const cm = confusion(EVAL.y, atThreshold(EVAL.models[key].s, t));
+    return { cm, m: classMetrics(cm) };
+  };
+  /* the thresholds the buttons move to, recomputed for whichever model is on */
+  const bestF1 = () => {
+    let best = 0.5, bf = -1;
+    for (let k = 2; k <= 98; k++) {
+      const f = at(k / 100).m.f1 || 0;
+      if (f > bf) { bf = f; best = k / 100; }
+    }
+    return best;
+  };
+  const fullRecall = () => {
+    let t = 0.02;
+    for (let k = 2; k <= 98; k++) if (at(k / 100).m.recall >= 0.999) t = k / 100;
+    return t;
+  };
+
+  let drawDist, drawRoc;
   const update = () => {
     const t = +thrEl.value / 100;
     thrEl.nextElementSibling.textContent = t.toFixed(2);
-    const { cm, m } = AT[Math.round(t * 100) - 2];
-    confusionGrid('thr-cm', cm);
-    document.getElementById('thr-metrics').innerHTML = [
-      ['Accuracy', m.accuracy, ''],
-      ['Precision', m.precision, ''],
-      ['Recall', m.recall, ''],
-      ['F1', m.f1, Math.abs(t - bestF1.t) < 0.005 ? 'stat--train' : ''],
-    ].map(([n, v, c]) => `<div class="stat ${c}">
+    document.querySelectorAll('#tv-model button').forEach((b) =>
+      b.setAttribute('aria-pressed', String(b.dataset.m === key)));
+    const { cm, m } = at(t);
+    confusionGrid('tv-cm', cm);
+    const bf = bestF1();
+    document.getElementById('tv-metrics').innerHTML = [
+      ['Accuracy', m.accuracy, 'right, of all homes'],
+      ['Precision', m.precision, 'right, of those flagged'],
+      ['Recall', m.recall, 'caught, of the quick sales'],
+      ['F1', m.f1, `best is ${at(bf).m.f1.toFixed(3)}, at ${bf.toFixed(2)}`],
+    ].map(([n, v, sub]) => `<div class="stat">
       <div class="stat__value" style="font-size:1.3rem">${Number.isFinite(v) ? v.toFixed(3) : '—'}</div>
-      <div class="stat__label">${n}</div></div>`).join('');
-    document.getElementById('thr-verdict').innerHTML = t <= 0.2
-      ? `<strong>A low threshold calls almost everything a quick sale.</strong> Recall is
-         ${pct(m.recall)}, because almost nothing is missed. Precision is ${pct(m.precision)},
-         because most of what it flags is wrong.`
-      : t >= 0.8
-        ? `<strong>A high threshold only commits when it is sure.</strong> Precision is
-           ${pct(m.precision)}, so a flagged home usually does sell fast. Recall is
-           ${pct(m.recall)}: it misses ${cm.fn} of the ${cm.tp + cm.fn} homes that sold quickly.`
-        : `At ${t.toFixed(2)} the model flags ${cm.tp + cm.fp} homes, of which ${cm.tp} really
-           did sell quickly. Precision ${pct(m.precision)}, recall ${pct(m.recall)}.`;
-    document.getElementById('thr-note').innerHTML =
-      `The model has not changed and neither have its probabilities. Only the line between `
-      + `"call it a quick sale" and "do not" has moved. F1 is highest at a threshold of `
-      + `<b>${bestF1.t.toFixed(2)}</b> (${bestF1.m.f1.toFixed(3)}), not at 0.5 — the default `
-      + `is a convention rather than an answer.`;
-    drawStrip();
+      <div class="stat__label"><b>${n}</b><br><span class="muted">${sub}</span></div></div>`).join('');
+    const M = EVAL.models[key];
+    const fpr = cm.fp / (cm.fp + cm.tn || 1), tpr = cm.tp / (cm.tp + cm.fn || 1);
+    document.getElementById('tv-note').innerHTML =
+      `At ${t.toFixed(2)} the model, using ${M.name}, catches <b>${pct(tpr)}</b> of the homes `
+      + `that sold quickly and wrongly flags <b>${pct(fpr)}</b> of the rest. That pair is the dot `
+      + `on the ROC curve, and the curve is every other threshold's pair. Sliding the threshold `
+      + `moves the dot and leaves the curve and its AUC of <b>${M.A.toFixed(3)}</b> exactly where `
+      + `they are, because those describe the model rather than the cut-off. Change the model and `
+      + `the curve itself moves: the histograms pull apart or slide together, and the area grows `
+      + `or shrinks with them.`;
+    drawDist();
+    drawRoc();
   };
 
-  drawStrip = () => {
+  drawDist = () => {
     const t = +thrEl.value / 100;
-    const w = 900, h = 120;
-    const pad = { l: 46, r: 16, t: 20, b: 34 };
-    const svg = svgRoot(stripHost, w, h);
+    const s = EVAL.models[key].s;
+    const w = 560, h = 340;
+    const pad = { l: 52, r: 16, t: 26, b: 44 };
+    const svg = svgRoot(distHost, w, h);
+    const BINS = 25;
+    const count = (cls) => {
+      const out = new Array(BINS).fill(0);
+      s.forEach((p, i) => { if (EVAL.y[i] === cls) out[Math.min(BINS - 1, Math.floor(p * BINS))]++; });
+      return out;
+    };
+    const up = count(1), down = count(0);
+    const peak = Math.max(...up, ...down) * 1.12;
     const sx = scale(0, 1, pad.l, w - pad.r);
-    el('line', { x1: pad.l, x2: w - pad.r, y1: h - pad.b, y2: h - pad.b,
-      stroke: token('--baseline') }, svg);
+    const mid = (pad.t + h - pad.b) / 2;
+    const sy = scale(0, peak, mid, pad.t);
+    const sd = scale(0, peak, mid, h - pad.b);
+    /* frame by hand: the vertical axis runs both ways from the middle */
     for (const v of [0, 0.25, 0.5, 0.75, 1]) {
-      el('text', { class: 'tick', x: sx(v), y: h - pad.b + 15, 'text-anchor': 'middle' }, svg)
+      el('text', { class: 'tick', x: sx(v), y: h - pad.b + 14, 'text-anchor': 'middle' }, svg)
         .textContent = v.toFixed(2);
     }
-    el('text', { class: 'axis-label', x: (pad.l + w - pad.r) / 2, y: h - 3,
-      'text-anchor': 'middle' }, svg).textContent = 'Predicted probability of selling within thirty days';
-    /* every held-out home, placed by its predicted probability */
-    EVAL.s.forEach((p, i) => {
-      el('circle', { cx: sx(p), cy: h - pad.b - 12 - (i % 5) * 7, r: 3,
-        fill: token(CLS[EVAL.y[i]]), opacity: 0.6 }, svg);
+    el('line', { class: 'axis', x1: pad.l, x2: w - pad.r, y1: mid, y2: mid }, svg);
+    el('text', { class: 'axis-label', x: (pad.l + w - pad.r) / 2, y: h - 2, 'text-anchor': 'middle' }, svg)
+      .textContent = 'Predicted probability of selling within thirty days';
+    el('text', { class: 'direct-label', x: pad.l + 2, y: pad.t + 4, fill: token(CLS[1]) }, svg)
+      .textContent = `${NAMES[1]} ↑`;
+    el('text', { class: 'direct-label', x: pad.l + 2, y: h - pad.b - 4, fill: token(CLS[0]) }, svg)
+      .textContent = `${NAMES[0]} ↓`;
+
+    const bw = (w - pad.l - pad.r) / BINS;
+    const bars = (hist, cls, ys, above) => hist.forEach((n, i) => {
+      if (!n) return;
+      const x0 = pad.l + i * bw;
+      const centre = (i + 0.5) / BINS;
+      /* a bar on the wrong side of the threshold is a mistake, drawn hollow */
+      const wrong = cls === 1 ? centre < t : centre >= t;
+      const y = above ? ys(n) : mid;
+      const hh = Math.abs(ys(n) - mid);
+      el('rect', {
+        x: x0 + 1, width: Math.max(1, bw - 2), y, height: hh, rx: 2,
+        fill: wrong ? 'none' : token(CLS[cls]), opacity: wrong ? 1 : 0.72,
+        stroke: wrong ? token(CLS[cls]) : 'none', 'stroke-width': wrong ? 1.6 : 0,
+        'stroke-dasharray': wrong ? '3 2' : null,
+      }, svg);
     });
-    el('line', { x1: sx(t), x2: sx(t), y1: pad.t - 6, y2: h - pad.b,
-      stroke: token('--series-6'), 'stroke-width': 2.5 }, svg);
-    el('text', { class: 'annot', x: sx(t), y: pad.t - 10, 'text-anchor': 'middle',
-      fill: token('--series-6'), 'font-weight': 640 }, svg).textContent = `threshold ${t.toFixed(2)}`;
-    el('text', { class: 'annot', x: sx(t) - 8, y: h - pad.b - 3, 'text-anchor': 'end',
-      fill: token('--text-muted') }, svg).textContent = '← called still listed';
-    el('text', { class: 'annot', x: sx(t) + 8, y: h - pad.b - 3,
-      fill: token('--text-muted') }, svg).textContent = 'called sold fast →';
+    bars(up, 1, sy, true);
+    bars(down, 0, sd, false);
+
+    /* the threshold, and the four counts in the four regions it makes */
+    el('line', { x1: sx(t), x2: sx(t), y1: pad.t - 10, y2: h - pad.b,
+      stroke: token('--text-primary'), 'stroke-width': 2.5 }, svg);
+    el('text', { class: 'annot', x: sx(t), y: pad.t - 14, 'text-anchor': 'middle',
+      fill: token('--text-primary'), 'font-weight': 640 }, svg).textContent = `threshold ${t.toFixed(2)}`;
+    const { cm } = at(t);
+    const tag = (x, y, anchor, text, color) => el('text', {
+      x, y, 'text-anchor': anchor, 'font-size': 11, 'font-weight': 680, fill: token(color),
+    }, svg).textContent = text;
+    tag(sx(t) + 7, pad.t + 18, 'start', `TP ${cm.tp}`, '--good');
+    tag(sx(t) - 7, pad.t + 18, 'end', `FN ${cm.fn}`, '--critical');
+    tag(sx(t) + 7, h - pad.b - 22, 'start', `FP ${cm.fp}`, '--critical');
+    tag(sx(t) - 7, h - pad.b - 22, 'end', `TN ${cm.tn}`, '--good');
   };
 
-  thrEl.addEventListener('input', update);
-  document.getElementById('thr-half').addEventListener('click', () => tweenInput(thrEl, 50, update));
-  document.getElementById('thr-f1').addEventListener('click', () =>
-    tweenInput(thrEl, Math.round(bestF1.t * 100), update));
-  document.getElementById('thr-recall').addEventListener('click', () =>
-    tweenInput(thrEl, Math.round(fullRecall.t * 100), update));
-  responsive(stripHost, update);
-}
-
-/* ---- ROC and AUC ---- */
-{
-  const host = document.getElementById('roc-chart');
-  const thrEl = document.getElementById('roc-thr');
-  const cmpEl = document.getElementById('roc-compare');
-  const PTS = roc(EVAL.y, EVAL.s);
-  const PTS_WEAK = roc(EVAL.y, EVAL.sWeak);
-
-  let draw;
-  const update = () => {
+  drawRoc = () => {
     const t = +thrEl.value / 100;
-    thrEl.nextElementSibling.textContent = t.toFixed(2);
-    const cm = confusion(EVAL.y, atThreshold(EVAL.s, t));
-    const fpr = cm.fp / (cm.fp + cm.tn || 1);
-    const tpr = cm.tp / (cm.tp + cm.fn || 1);
-    document.getElementById('roc-stats').innerHTML = `
-      <div class="stat"><div class="stat__value">${EVAL.A.toFixed(3)}</div>
-        <div class="stat__label">AUC<br><span class="muted">1.0 is perfect, 0.5 is a coin flip</span></div></div>
-      ${cmpEl.checked ? `<div class="stat stat--muted" style="margin-top:0.7rem">
-        <div class="stat__value">${EVAL.Aweak.toFixed(3)}</div>
-        <div class="stat__label">AUC of the one-feature model</div></div>` : ''}`;
-    document.getElementById('roc-read').innerHTML =
-      `At a threshold of <b>${t.toFixed(2)}</b> the model catches <b>${pct(tpr)}</b> of the `
-      + `homes that did sell quickly, and wrongly flags <b>${pct(fpr)}</b> of the ones that did `
-      + `not. That pair of numbers is one point on the curve. Every other threshold is another `
-      + `point, and the curve is all of them.`;
-    document.getElementById('roc-note').innerHTML =
-      `AUC has a reading that needs no curve at all: <b>take one home that sold quickly and one `
-      + `that did not, at random, and AUC is the chance the model scores the quick one higher.</b> `
-      + `At ${EVAL.A.toFixed(3)} it gets that ordering right about ${pct(EVAL.A)} of the time. `
-      + `Because the question is about ordering rather than counting, AUC is unaffected by how `
-      + `common each class is, which is the failing of accuracy from section 8.`;
-    draw();
-  };
-
-  draw = () => {
-    const t = +thrEl.value / 100;
-    const w = 440, h = 400;
-    const pad = { l: 56, r: 16, t: 16, b: 48 };
-    const svg = svgRoot(host, w, h);
+    const M = EVAL.models[key];
+    const w = 360, h = 340;
+    const pad = { l: 50, r: 14, t: 16, b: 44 };
+    const svg = svgRoot(rocHost, w, h);
     const sx = scale(0, 1, pad.l, w - pad.r);
     const sy = scale(0, 1, h - pad.b, pad.t);
     frame(svg, w, h, pad, sx, sy, {
       xLabel: 'False positive rate', yLabel: 'True positive rate',
-      xTicks: [0, 0.25, 0.5, 0.75, 1], yTicks: [0, 0.25, 0.5, 0.75, 1],
-      xFmt: (v) => v.toFixed(2), yFmt: (v) => v.toFixed(2),
+      xTicks: [0, 0.5, 1], yTicks: [0, 0.5, 1],
+      xFmt: (v) => v.toFixed(1), yFmt: (v) => v.toFixed(1),
     });
-    const g = el('g', { 'clip-path': clipRect(svg, 'roc-clip', pad, w, h) }, svg);
-    /* the area under the curve, shaded */
-    el('path', {
-      d: `M${sx(0)} ${sy(0)} ` + PTS.map((p) => `L${sx(p.fpr)} ${sy(p.tpr)}`).join(' ')
-        + ` L${sx(1)} ${sy(0)} Z`,
-      fill: token('--accent'), opacity: 0.12,
-    }, g);
-    el('path', { class: 'series-line', stroke: token('--baseline'), 'stroke-width': 1.5,
-      'stroke-dasharray': '5 4', d: linePath([[sx(0), sy(0)], [sx(1), sy(1)]]) }, g);
-    el('text', { class: 'annot', x: sx(0.62), y: sy(0.52), fill: token('--text-muted'),
-      transform: `rotate(-45 ${sx(0.62)} ${sy(0.52)})` }, g).textContent = 'a model guessing at random';
-    if (cmpEl.checked) {
-      el('path', { class: 'series-line', stroke: token('--text-muted'), 'stroke-width': 2,
-        d: linePath(PTS_WEAK.map((p) => [sx(p.fpr), sy(p.tpr)])) }, g);
+    /* the other two models, faint, so moving between them reads as the curve
+       moving rather than as a new chart */
+    for (const [k, other] of Object.entries(EVAL.models)) {
+      if (k === key) continue;
+      el('path', { class: 'series-line', stroke: token('--text-muted'), 'stroke-width': 1.2,
+        opacity: 0.45, d: linePath(roc(EVAL.y, other.s).map((p) => [sx(p.fpr), sy(p.tpr)])) }, svg);
     }
-    el('path', { class: 'series-line', stroke: token('--accent'), 'stroke-width': 2.8,
-      d: linePath(PTS.map((p) => [sx(p.fpr), sy(p.tpr)])) }, g);
-    const cm = confusion(EVAL.y, atThreshold(EVAL.s, t));
-    const fpr = cm.fp / (cm.fp + cm.tn || 1);
-    const tpr = cm.tp / (cm.tp + cm.fn || 1);
-    el('line', { x1: sx(fpr), x2: sx(fpr), y1: sy(0), y2: sy(tpr),
-      stroke: token('--series-6'), 'stroke-width': 1, 'stroke-dasharray': '3 3' }, g);
-    el('circle', { cx: sx(fpr), cy: sy(tpr), r: 7, fill: token('--series-6'),
-      stroke: token('--surface-1'), 'stroke-width': 2 }, g);
-    el('text', { class: 'annot', x: sx(fpr) + 11, y: sy(tpr) + 4, fill: token('--series-6'),
-      'font-weight': 620 }, g).textContent = `threshold ${t.toFixed(2)}`;
-    el('text', { class: 'annot', x: sx(0.04), y: sy(0.96), fill: token('--accent'),
-      'font-weight': 640 }, g).textContent = `AUC ${EVAL.A.toFixed(3)}`;
+    const pts = roc(EVAL.y, M.s);
+    el('path', {
+      d: `M${sx(0)} ${sy(0)} ` + pts.map((p) => `L${sx(p.fpr)} ${sy(p.tpr)}`).join(' ') + ` L${sx(1)} ${sy(0)} Z`,
+      fill: token('--accent'), opacity: 0.13,
+    }, svg);
+    el('line', { x1: sx(0), y1: sy(0), x2: sx(1), y2: sy(1),
+      stroke: token('--text-muted'), 'stroke-dasharray': '4 3' }, svg);
+    el('text', { class: 'tick', x: sx(0.64), y: sy(0.55),
+      transform: `rotate(-45 ${sx(0.64)} ${sy(0.55)})` }, svg).textContent = 'chance';
+    el('path', { class: 'series-line', stroke: token('--accent'), 'stroke-width': 2.6,
+      d: linePath(pts.map((p) => [sx(p.fpr), sy(p.tpr)])) }, svg);
+    const { cm } = at(t);
+    const fpr = cm.fp / (cm.fp + cm.tn || 1), tpr = cm.tp / (cm.tp + cm.fn || 1);
+    el('circle', { cx: sx(fpr), cy: sy(tpr), r: 6.5, fill: token('--text-primary'),
+      stroke: token('--surface-1'), 'stroke-width': 2 }, svg);
+    el('text', { x: sx(0.97), y: sy(0.09), 'text-anchor': 'end', 'font-size': 15,
+      'font-weight': 680, fill: token('--accent') }, svg).textContent = `AUC ${M.A.toFixed(3)}`;
+    el('text', { class: 'tick', x: sx(0.97), y: sy(0.03), 'text-anchor': 'end' }, svg)
+      .textContent = 'the shaded area';
   };
 
   thrEl.addEventListener('input', update);
-  cmpEl.addEventListener('change', update);
-  responsive(host, update);
+  document.querySelectorAll('#tv-model button').forEach((b) =>
+    b.addEventListener('click', () => { key = b.dataset.m; update(); }));
+  document.getElementById('thr-half').addEventListener('click', () => tweenInput(thrEl, 50, update));
+  document.getElementById('thr-f1').addEventListener('click', () =>
+    tweenInput(thrEl, Math.round(bestF1() * 100), update));
+  document.getElementById('thr-recall').addEventListener('click', () =>
+    tweenInput(thrEl, Math.round(fullRecall() * 100), update));
+  responsive(distHost, update);
+  responsive(rocHost, drawRoc);
+
+  /* AUC's reading as a ranking, stated with this model's own number */
+  const A = EVAL.models.four.A;
+  document.getElementById('auc-reading').innerHTML =
+    `AUC also has a reading that needs no curve: <strong>take one home that sold quickly and `
+    + `one that did not, at random, and AUC is the chance the model scores the quick one `
+    + `higher.</strong> The four-feature model gets that ordering right about <b>${pct(A)}</b> of `
+    + `the time, the model using distance to the LRT alone about `
+    + `<b>${pct(EVAL.models.lrt.A)}</b>. Because the question is about ordering rather than `
+    + `counting, AUC is unaffected by how common each class is, which is exactly where `
+    + `<a href="#metrics">accuracy</a> fails.`;
 }
