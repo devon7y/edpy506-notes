@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rng, mean } from '../assets/site.js';
+import { rng, mean } from '../site/assets/site.js';
 import {
   growTree, predictTree, pathTree, countLeaves, treeDepth, treeSSE,
   pruneTree, randomForest, mseOf, shuffleColumn, permutationImportance,
-} from '../assets/trees.js';
-import { currentDataset, pairs, treeDesign } from '../assets/datasets.js';
+} from '../site/assets/trees.js';
+import { currentDataset, pairs, treeDesign } from '../site/assets/datasets.js';
 
 const ds = currentDataset();
 const curvedSample = (seed, n) => pairs(ds, 'curved', seed, n);

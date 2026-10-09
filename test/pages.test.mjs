@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = new URL('../site/', import.meta.url).pathname;
 
 /* The instructor's own demos sit in the working directory as reference and are
    gitignored by the same pattern. They are not ours and not part of the site,

@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rng, gauss, mean } from '../assets/site.js';
+import { rng, gauss, mean } from '../site/assets/site.js';
 import {
   ols, metrics, linsolve, lstsq, polyfit, standardize, ridge, lasso,
   lassoLambdaMax, regPath, fitRegularized, crossValidate, logGrid,
-} from '../assets/linreg.js';
-import { currentDataset, pairs, linearDesign } from '../assets/datasets.js';
+} from '../site/assets/linreg.js';
+import { currentDataset, pairs, linearDesign } from '../site/assets/datasets.js';
 
 const ds = currentDataset();
 /* The three views every test below uses: price against size (roughly a

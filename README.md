@@ -11,12 +11,12 @@ when you do.
 
 | Page | Covers |
 |---|---|
-| [Regression](regression.html) | Least squares, R² and RMSE, multiple regression, bias and variance, under- and overfitting, ridge, lasso, choosing λ by cross-validation |
-| [Decision trees and random forests](trees.html) | Where a split comes from, growing and overgrowing a tree, cost-complexity pruning, hyperparameters, random forests, permutation importance |
-| [Classification](classification.html) | Why a line cannot predict a probability, logistic regression, k-nearest neighbours, support vector machines, the confusion matrix, precision and recall, the threshold, ROC and AUC |
-| [Imbalanced classes](imbalance.html) | What imbalance is and why accuracy misleads, random undersampling and oversampling, SMOTE, the hybrid, comparing them on a rare class |
-| [Feature engineering](features.html) | Extraction, scaling, encoding, cleaning, filter methods, forward selection and recursive feature elimination, domain knowledge |
-| [Model tuning](tuning.html) | Parameters and hyperparameters, cross-validation, grid and random search, tuning lasso, trees and forests, why the test set waits |
+| [Regression](https://devon7y.github.io/edpy506-notes/regression.html) | Least squares, R² and RMSE, multiple regression, bias and variance, under- and overfitting, ridge, lasso, choosing λ by cross-validation |
+| [Decision trees and random forests](https://devon7y.github.io/edpy506-notes/trees.html) | Where a split comes from, growing and overgrowing a tree, cost-complexity pruning, hyperparameters, random forests, permutation importance |
+| [Classification](https://devon7y.github.io/edpy506-notes/classification.html) | Why a line cannot predict a probability, logistic regression, k-nearest neighbours, support vector machines, the confusion matrix, precision and recall, the threshold, ROC and AUC |
+| [Imbalanced classes](https://devon7y.github.io/edpy506-notes/imbalance.html) | What imbalance is and why accuracy misleads, random undersampling and oversampling, SMOTE, the hybrid, comparing them on a rare class |
+| [Feature engineering](https://devon7y.github.io/edpy506-notes/features.html) | Extraction, scaling, encoding, cleaning, filter methods, forward selection and recursive feature elimination, domain knowledge |
+| [Model tuning](https://devon7y.github.io/edpy506-notes/tuning.html) | Parameters and hyperparameters, cross-validation, grid and random search, tuning lasso, trees and forests, why the test set waits |
 
 ## Running it locally
 
@@ -24,12 +24,14 @@ No build step and no dependencies. It has to be *served* rather than opened as
 a `file://` path, because the pages are ES modules.
 
 ```bash
-python3 -m http.server 8000
+npm run serve        # or: python3 -m http.server 8000 -d site
 # then open http://localhost:8000
 ```
 
-Pushing to `main` republishes the site. GitHub Pages serves this repository
-directly, so run `npm run check` before pushing.
+The published site is the `site/` folder. Pushing to `main` runs the unit tests
+and the prose audit in GitHub Actions and, if they pass, publishes `site/` to
+GitHub Pages. The browser check runs only locally, so run `npm run check`
+before pushing.
 
 ## Checks
 
@@ -51,7 +53,7 @@ problem, and whether it sells inside thirty days, which is a classification
 problem on identical features.
 
 The homes are **simulated**, not real Edmonton sales. They are generated from a
-seeded random number generator in `assets/datasets.js`, so the site draws the
+seeded random number generator in `site/assets/datasets.js`, so the site draws the
 same homes every time, and because the true relationship is known the pages can
 say honestly when a model has found it and when it has not. Three of the nine
 features have no effect on price at all; several figures exist to show what

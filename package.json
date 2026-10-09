@@ -7,7 +7,7 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "check": "node --test test/*.test.mjs && python3 tools/check_prose.py && python3 tools/check_pages.py",
-    "serve": "python3 -m http.server 8000",
+    "serve": "python3 -m http.server 8000 -d site",
     "check:prose": "python3 tools/check_prose.py"
   }
 }

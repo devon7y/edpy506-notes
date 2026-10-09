@@ -27,7 +27,7 @@ separate. If something genuinely seems missing, ask; do not fill it in.
 **2. Pages are organised by topic, not by lecture.** A lecture that covers two
 topics becomes two pages. A topic revisited in a later lecture extends its
 existing page rather than starting a second one. `CHAPTERS` in
-`assets/site.js` is the single list that drives the top bar, the index cards
+`site/assets/site.js` is the single list that drives the top bar, the index cards
 and the prev/next pager — add a page there and it appears in all three.
 
 **3. Every number in the prose is computed, never typed.** If a paragraph says
@@ -35,14 +35,14 @@ the best degree is 2, or that lasso dropped four predictors, that sentence is
 built in JavaScript from the same computation the figure beside it ran. This is
 what stops the text drifting away from the figures when a seed or a sample size
 changes. Look at how `figure__note` and `keypoint` contents are assembled in
-`assets/regression-page.js` — none of those sentences are static HTML.
+`site/assets/regression-page.js` — none of those sentences are static HTML.
 
 ## The running example
 
 Every page uses the same dataset: **synthetic Edmonton home prices**, with the
 features from Dr. Bulut's in-class demos (size, bedrooms, neighbourhood, age,
 garage, distance to LRT, front door colour, house number, odd/even). It is
-generated in `assets/datasets.js` from a seeded RNG, so the site draws the same
+generated in `site/assets/datasets.js` from a seeded RNG, so the site draws the same
 homes on every visit.
 
 The same rows carry **two targets**. `target` is the price, which makes a
@@ -72,7 +72,7 @@ Four properties of it are load-bearing, and changing any of them breaks pages:
 
 ### Adding another dataset later
 
-`assets/datasets.js` is built for this. `DATASETS` maps an id to a descriptor
+`site/assets/datasets.js` is built for this. `DATASETS` maps an id to a descriptor
 with `name`, `target`, `features`, a seeded `sample(seed, n, fixed)`, and
 `views.linear` / `views.curved` naming which feature to plot for the
 one-feature figures. Add an entry and the pages pick it up from
@@ -83,28 +83,34 @@ figures stops being true.
 ## Layout
 
 ```text
-index.html            landing page and the running example
-regression.html       topic 1
-trees.html            topic 2
-classification.html   topic 3
-imbalance.html        topic 4: imbalanced classes and resampling
-features.html         topic 5: feature engineering and selection
-tuning.html           topic 6: cross-validation, grid and random search
-assets/
-  site.css            design tokens, layout, components — light and dark
-  site.js             chrome (nav, theme, pager), SVG helpers, small stats, RNG
-  datasets.js         the homes, and the encodings each model needs
-  linreg.js           OLS, metrics, polyfit, ridge, lasso, cross-validation
-  trees.js            CART, pruning, random forest, permutation and MDI importance
-  classify.js         logistic regression, KNN, SVM, confusion matrix, ROC/AUC
-  imbalance.js        undersampling, oversampling, SMOTE, the hybrid
-  features.js         scaling, correlation filter, forward selection, RFE
-  tuning.js           k-fold splits, grid and random points, a background job runner
-  *-page.js           every figure on the page of the same name
+site/                 everything that is published, and nothing else
+  index.html          landing page and the running example
+  regression.html     topic 1
+  trees.html          topic 2
+  classification.html topic 3
+  imbalance.html      topic 4: imbalanced classes and resampling
+  features.html       topic 5: feature engineering and selection
+  tuning.html         topic 6: cross-validation, grid and random search
+  assets/
+    site.css          design tokens, layout, components — light and dark
+    site.js           chrome (nav, theme, pager), SVG helpers, small stats, RNG
+    datasets.js       the homes, and the encodings each model needs
+    linreg.js         OLS, metrics, polyfit, ridge, lasso, cross-validation
+    trees.js          CART, pruning, random forest, permutation and MDI importance
+    classify.js       logistic regression, KNN, SVM, confusion matrix, ROC/AUC
+    imbalance.js      undersampling, oversampling, SMOTE, the hybrid
+    features.js       scaling, correlation filter, forward selection, RFE
+    tuning.js         k-fold splits, grid and random points, a background job runner
+    *-page.js         every figure on the page of the same name
 test/                 node tests: the maths, and the pages' structure
 tools/check_pages.py  browser check: errors, empty figures, overflow, id clashes
 tools/check_prose.py  flags metadiscourse in the pages and the page scripts
+.github/workflows/pages.yml  tests, prose audit, then publishes site/
 ```
+
+The repository root also holds the course materials (slides, demos, the
+instructor's example folders). They are read as reference and are never part
+of `site/`.
 
 The maths modules import nothing but `site.js` (and `imbalance.js` uses
 `standardize` from `linreg.js`) and use plain arrays, which is what lets
@@ -131,10 +137,14 @@ blue", never "darker".
 
 ## Publishing
 
-The site is served straight from `main` by GitHub Pages at
-<https://devon7y.github.io/edpy506-notes/>. There is no build and no deploy
-step: pushing to `main` republishes it a minute or so later. Run the checks
-below before pushing, because a broken push is a broken public page.
+The site is served by GitHub Pages at
+<https://devon7y.github.io/edpy506-notes/>. Pushing to `main` runs
+`.github/workflows/pages.yml`, which runs the unit tests and the prose audit and,
+if both pass, uploads `site/` and nothing else. The browser check needs
+playwright and does not run there, so run `npm run check` before pushing,
+because a broken push is a broken public page.
+
+Anything placed in `site/` is public. Course materials stay outside it.
 
 The repository is public, which is what makes Pages free on this account. That
 is the reason the slides, the syllabus and the instructor's demos are
@@ -146,7 +156,7 @@ gitignored rather than merely untracked.
 npm test            # node unit tests for the maths
 npm run check       # unit tests, prose audit, then every page in a real browser
 npm run check:prose # the prose audit alone
-npm run serve       # http://localhost:8000
+npm run serve       # http://localhost:8000, serving site/
 ```
 
 `tools/check_prose.py` flags the mechanical cases of the six rules below. It
@@ -262,7 +272,7 @@ does; a **figure note** states what the numbers show, not what the reader is
 about to be shown. Cross-links between topic pages are real `<a href>` anchors,
 which makes them the allowed kind of pointer.
 
-Most of the prose on this site is assembled in `assets/*-page.js` rather than
+Most of the prose on this site is assembled in `site/assets/*-page.js` rather than
 written in the HTML, so audit both. Deleting metadiscourse usually shortens the
 text and never costs information, because it carried none.
 

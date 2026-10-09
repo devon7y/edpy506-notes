@@ -17,7 +17,7 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent / "site"
 PORT = 8765
 WIDTHS = (390, 768, 1280)
 

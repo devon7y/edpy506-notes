@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rng, mean } from '../assets/site.js';
-import { classes, undersample, oversample, smote, smoteUnder } from '../assets/imbalance.js';
-import { zscore, minmax, pearson, correlationFilter, forwardSelect, rfe } from '../assets/features.js';
-import { kfold, cvScore, holdout, gridPoints, randomPoints, runJobs } from '../assets/tuning.js';
-import { growTree, randomForest, treeImportance, forestImportance } from '../assets/trees.js';
-import { currentDataset, marketLabels, treeDesign } from '../assets/datasets.js';
+import { rng, mean } from '../site/assets/site.js';
+import { classes, undersample, oversample, smote, smoteUnder } from '../site/assets/imbalance.js';
+import { zscore, minmax, pearson, correlationFilter, forwardSelect, rfe } from '../site/assets/features.js';
+import { kfold, cvScore, holdout, gridPoints, randomPoints, runJobs } from '../site/assets/tuning.js';
+import { growTree, randomForest, treeImportance, forestImportance } from '../site/assets/trees.js';
+import { currentDataset, marketLabels, treeDesign } from '../site/assets/datasets.js';
 
 const ds = currentDataset();
 const count = (y, v) => y.filter((c) => c === v).length;

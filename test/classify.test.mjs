@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rng, gauss, mean } from '../assets/site.js';
+import { rng, gauss, mean } from '../site/assets/site.js';
 import {
   sigmoid, logisticFit, minkowski, knn, svmFit, confusion, classMetrics,
   atThreshold, roc, auc, accuracyOf, split,
-} from '../assets/classify.js';
-import { standardize } from '../assets/linreg.js';
-import { currentDataset, labelled, classDesign } from '../assets/datasets.js';
+} from '../site/assets/classify.js';
+import { standardize } from '../site/assets/linreg.js';
+import { currentDataset, labelled, classDesign } from '../site/assets/datasets.js';
 
 const ds = currentDataset();
 const close = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) < tol, `${a} vs ${b}`);
